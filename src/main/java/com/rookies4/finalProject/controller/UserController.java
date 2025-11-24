@@ -1,4 +1,55 @@
 package com.rookies4.finalProject.controller;
 
+import com.rookies4.finalProject.dto.UserDTO;
+import com.rookies4.finalProject.security.SecurityUtil;
+import com.rookies4.finalProject.service.UserService;
+import jakarta.validation.Valid;
+import lombok.RequiredArgsConstructor;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.*;
+
+@RestController
+@RequestMapping("/api/users")
+@RequiredArgsConstructor
 public class UserController {
+
+    private final UserService userService;
+
+    // 1. 회원가입 (공개 엔드포인트)
+    @PostMapping
+    public ResponseEntity<UserDTO.UserResponse> createUser(@Valid @RequestBody UserDTO.SignUpRequest request) {
+        return ResponseEntity.status(HttpStatus.CREATED).body(userService.createUser(request));
+    }
+
+    // 2. 현재 로그인한 사용자 정보 조회
+    @GetMapping("/me")
+    public ResponseEntity<UserDTO.UserResponse> getCurrentUser() {
+        Long userId = SecurityUtil.getCurrentUserId();
+        if (userId == null) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
+        }
+        return ResponseEntity.ok(userService.readUser(userId));
+    }
+
+    // 3. 회원 조회 (ID로 조회)
+    @GetMapping("/{userId}")
+    public ResponseEntity<UserDTO.UserResponse> readUser(@PathVariable Long userId) {
+        return ResponseEntity.ok(userService.readUser(userId));
+    }
+
+    // 4. 회원 정보 수정
+    @PutMapping("/{userId}")
+    public ResponseEntity<UserDTO.UserResponse> updateUser(
+            @PathVariable Long userId,
+            @Valid @RequestBody UserDTO.UpdateRequest request) {
+        return ResponseEntity.ok(userService.updateUser(userId, request));
+    }
+
+    // 5. 회원 삭제
+    @DeleteMapping("/{userId}")
+    public ResponseEntity<Void> deleteUser(@PathVariable Long userId) {
+        userService.deleteUser(userId);
+        return ResponseEntity.noContent().build();
+    }
 }
