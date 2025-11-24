@@ -1,18 +1,15 @@
 package com.rookies4.finalProject.exception.advice;
 
-
-import com.rookies4.miniproject3.exception.BusinessException;
-import com.rookies4.miniproject3.exception.EntityNotFoundException;
-import com.rookies4.miniproject3.exception.ErrorCode;
-import com.rookies4.miniproject3.exception.ValidationException;
+import com.rookies4.finalProject.exception.BusinessException;
+import com.rookies4.finalProject.exception.ErrorCode;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.MethodArgumentNotValidException;
+import org.springframework.security.access.AccessDeniedException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 
-import java.nio.file.AccessDeniedException;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.stream.Collectors;
@@ -42,34 +39,6 @@ public class GlobalExceptionHandler {
     }
 
     /**
-     * 검증 예외 처리
-     */
-    @ExceptionHandler(ValidationException.class)
-    public ResponseEntity<ErrorResponse> handleValidationException(ValidationException e) {
-        log.warn("Validation exception: {}", e.getMessage());
-
-        List<ErrorResponse.FieldError> fieldErrors = e.getFieldErrors().stream()
-                .map(fieldError -> ErrorResponse.FieldError.builder()
-                        .field(fieldError.getField())
-                        .message(fieldError.getMessage())
-                        .rejectedValue(fieldError.getRejectedValue())
-                        .build())
-                .collect(Collectors.toList());
-
-        ErrorResponse errorResponse = ErrorResponse.builder()
-                .success(false)
-                .error(ErrorResponse.ErrorDetail.builder()
-                        .code(e.getErrorCode().getCode())
-                        .message(e.getErrorCode().getMessage())
-                        .fieldErrors(fieldErrors)
-                        .build())
-                .timestamp(LocalDateTime.now())
-                .build();
-
-        return ResponseEntity.badRequest().body(errorResponse);
-    }
-
-    /**
      * Spring Validation 예외 처리
      */
     @ExceptionHandler(MethodArgumentNotValidException.class)
@@ -95,26 +64,6 @@ public class GlobalExceptionHandler {
                 .build();
 
         return ResponseEntity.badRequest().body(errorResponse);
-    }
-
-    /**
-     * 엔티티 없음 예외 처리
-     */
-    @ExceptionHandler(EntityNotFoundException.class)
-    public ResponseEntity<ErrorResponse> handleEntityNotFoundException(EntityNotFoundException e) {
-        log.warn("Entity not found: {}", e.getMessage());
-
-        ErrorResponse errorResponse = ErrorResponse.builder()
-                .success(false)
-                .error(ErrorResponse.ErrorDetail.builder()
-                        .code(e.getErrorCode().getCode())
-                        .message(e.getErrorCode().getMessage())
-                        .detail(e.getDetail())
-                        .build())
-                .timestamp(LocalDateTime.now())
-                .build();
-
-        return ResponseEntity.status(HttpStatus.NOT_FOUND).body(errorResponse);
     }
 
     /**

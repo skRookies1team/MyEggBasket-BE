@@ -11,7 +11,7 @@ import java.time.LocalDateTime;
 
 public class UserDTO {
 
-    // --- 1. 회원가입 요청 (POST /join) ---
+    // --- 1. 회원가입 요청
     @Data
     @NoArgsConstructor
     @AllArgsConstructor
@@ -36,7 +36,7 @@ public class UserDTO {
 
     }
 
-    // --- 2. 로그인 요청 (POST /login) ---
+    // --- 2. 로그인 요청 
     @Data
     @NoArgsConstructor
     @AllArgsConstructor
@@ -51,7 +51,7 @@ public class UserDTO {
     }
 
 
-    // --- 3. 사용자 정보 응답 (GET /me, GET /users/{id}) ---
+    // --- 3. 사용자 정보 응답 
     @Data
     @NoArgsConstructor
     @AllArgsConstructor
@@ -79,5 +79,29 @@ public class UserDTO {
                     .updatedAt(user.getUpdatedAt())
                     .build();
         }
+    }
+
+    // --- 4. 사용자 정보 수정 요청 
+    @Data
+    @NoArgsConstructor
+    @AllArgsConstructor
+    @Builder
+    public static class UpdateRequest {
+        // 이름은 null일 경우 수정하지 않도록 Optional 필드로 간주
+        private String username;
+        private String appkey;
+        private String appsecret;
+        // 다른 수정 가능한 필드 추가 가능 (예: fcmToken)
+    }
+
+    // --- 5. 로그인 응답 
+    @Data
+    @NoArgsConstructor
+    @AllArgsConstructor
+    @Builder
+    public static class LoginResponse {
+        private String accessToken;
+        private String tokenType = "Bearer";
+        private UserResponse user;
     }
 }
