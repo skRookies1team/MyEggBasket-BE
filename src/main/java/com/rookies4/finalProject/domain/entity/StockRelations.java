@@ -33,8 +33,8 @@ public class StockRelations {
     @Column(name = "weight")
     private Float weight; // 관계 강도 (0.0 ~ 1.0, GNN 학습 가중치)
 
-    @Column(name = "description", columnDefinition = "TEXT")
-    private String description; // 관계 설명 (예: "HBM 독점 공급")
+//    @Column(name = "description", columnDefinition = "TEXT")
+//    private String description; // 관계 설명 (예: "HBM 독점 공급")
 
     // toString에서 무한 루프 방지
     @Override
