@@ -35,6 +35,26 @@ public class Stock {
 //    @Column(name = "industry_code", length = 20)
 //    private String industryCode; // 산업분류코드
 
+    // 보유 내역
+    @OneToMany(mappedBy = "stock", cascade = CascadeType.ALL, orphanRemoval = true)
+    @Builder.Default
+    private List<Holding> holdings = new ArrayList<>();
+
+    // 거래 내역
+    @OneToMany(mappedBy = "stock", cascade = CascadeType.ALL, orphanRemoval = true)
+    @Builder.Default
+    private List<Transaction> transactions = new ArrayList<>();
+
+    // AI 추천 내역
+    @OneToMany(mappedBy = "stock", cascade = CascadeType.ALL, orphanRemoval = true)
+    @Builder.Default
+    private List<AIRecommendation> recommendations = new ArrayList<>();
+
+    // 피처 데이터
+    @OneToMany(mappedBy = "stock", cascade = CascadeType.ALL, orphanRemoval = true)
+    @Builder.Default
+    private List<StockFeatures> features = new ArrayList<>();
+
     // 이 종목이 영향을 주는 관계들 (from_stock)
     @OneToMany(mappedBy = "fromStock", cascade = CascadeType.ALL, orphanRemoval = true)
     @Builder.Default
