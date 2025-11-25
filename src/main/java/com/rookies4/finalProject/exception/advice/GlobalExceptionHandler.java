@@ -6,6 +6,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.MethodArgumentNotValidException;
+import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
@@ -59,6 +60,26 @@ public class GlobalExceptionHandler {
                         .code(ErrorCode.VALIDATION_ERROR.getCode())
                         .message(ErrorCode.VALIDATION_ERROR.getMessage())
                         .fieldErrors(fieldErrors)
+                        .build())
+                .timestamp(LocalDateTime.now())
+                .build();
+
+        return ResponseEntity.badRequest().body(errorResponse);
+    }
+
+    /**
+     * JSON 파싱 실패 등 요청 본문 변환 오류 처리
+     */
+    @ExceptionHandler(HttpMessageNotReadableException.class)
+    public ResponseEntity<ErrorResponse> handleHttpMessageNotReadableException(HttpMessageNotReadableException e) {
+        log.warn("Message not readable: {}", e.getMostSpecificCause().getMessage());
+
+        ErrorResponse errorResponse = ErrorResponse.builder()
+                .success(false)
+                .error(ErrorResponse.ErrorDetail.builder()
+                        .code(ErrorCode.VALIDATION_ERROR.getCode())
+                        .message("요청 본문을 읽을 수 없습니다. 입력 형식을 다시 확인하세요.")
+                        .detail(e.getMostSpecificCause().getMessage())
                         .build())
                 .timestamp(LocalDateTime.now())
                 .build();
