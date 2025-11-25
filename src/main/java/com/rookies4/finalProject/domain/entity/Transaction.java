@@ -1,6 +1,7 @@
 package com.rookies4.finalProject.domain.entity;
 
 import com.rookies4.finalProject.domain.enums.TransactionType;
+import com.rookies4.finalProject.domain.enums.TriggerSource;
 import jakarta.persistence.*;
 import lombok.*;
 
@@ -39,14 +40,15 @@ public class Transaction {
     @Column(name = "price", precision = 20, scale = 2)
     private BigDecimal price; // 체결 가격
 
-    @Column(name = "fee", precision = 10, scale = 2)
-    private BigDecimal fee; // 수수료
+//    @Column(name = "fee", precision = 10, scale = 2)
+//    private BigDecimal fee; // 수수료
+//
+//    @Column(name = "tax", precision = 10, scale = 2)
+//    private BigDecimal tax; // 세금
 
-    @Column(name = "tax", precision = 10, scale = 2)
-    private BigDecimal tax; // 세금
-
+    @Enumerated(EnumType.STRING)
     @Column(name = "trigger_source", length = 50)
-    private String triggerSource; // 주문 원천 (MANUAL, AI_AUTO_REBALANCE)
+    private TriggerSource triggerSource; // 주문 원천
 
     @Column(name = "executed_at", nullable = false)
     private LocalDateTime executedAt;

@@ -39,8 +39,8 @@ public class AIRecommendation {
     @Column(name = "suggested_price", precision = 20, scale = 2)
     private BigDecimal suggestedPrice; // 추천 진입가
 
-    @Column(name = "stop_loss_price", precision = 20, scale = 2)
-    private BigDecimal stopLossPrice; // 손절가
+//    @Column(name = "stop_loss_price", precision = 20, scale = 2)
+//    private BigDecimal stopLossPrice; // 손절가
 
     @Column(name = "reason_summary", columnDefinition = "TEXT")
     private String reasonSummary; // "3줄 요약" 근거
@@ -50,9 +50,6 @@ public class AIRecommendation {
 
     @Column(name = "created_at", nullable = false)
     private LocalDateTime createdAt;
-
-    @Column(name = "valid_until")
-    private LocalDateTime validUntil; // 유효 시간 (스캘핑의 경우 짧게)
 
     @PrePersist
     protected void onCreate() {

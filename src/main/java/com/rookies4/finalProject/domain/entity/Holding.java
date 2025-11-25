@@ -40,19 +40,6 @@ public class Holding {
     @Column(name = "target_weight")
     private Float targetWeight; // 목표 비중 (리밸런싱 타겟, 0.0 ~ 1.0)
 
-    @Column(name = "updated_at", nullable = false)
-    private LocalDateTime updatedAt;
-
-    @PrePersist
-    protected void onCreate() {
-        this.updatedAt = LocalDateTime.now();
-    }
-
-    @PreUpdate
-    protected void onUpdate() {
-        this.updatedAt = LocalDateTime.now();
-    }
-
     @Override
     public String toString() {
         return "Holding{" +

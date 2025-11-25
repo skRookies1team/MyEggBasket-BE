@@ -40,9 +40,6 @@ public class Portfolio {
     @Column(name = "risk_level", length = 20)
     private RiskLevel riskLevel;
 
-    @Column(name = "created_at", nullable = false, updatable = false)
-    private LocalDateTime createdAt;
-
     // 포트폴리오에 속한 보유 종목들
     @OneToMany(mappedBy = "portfolio", cascade = CascadeType.ALL, orphanRemoval = true)
     @Builder.Default
@@ -53,10 +50,10 @@ public class Portfolio {
     @Builder.Default
     private List<AIRecommendation> recommendations = new ArrayList<>();
 
-    @PrePersist
-    protected void onCreate() {
-        this.createdAt = LocalDateTime.now();
-    }
+    // 히스토리 리포트 목록
+    @OneToMany(mappedBy = "portfolio", cascade = CascadeType.ALL, orphanRemoval = true)
+    @Builder.Default
+    private List<HistoryReports> historyReports = new ArrayList<>();
 
     // 연관관계 편의 메서드
     public void addHolding(Holding holding) {
@@ -67,6 +64,12 @@ public class Portfolio {
     public void addRecommendation(AIRecommendation recommendation) {
         recommendations.add(recommendation);
         recommendation.setPortfolio(this);
+    }
+
+    // 연관관계 편의 메서드
+    public void addHistoryReport(HistoryReports report) {
+        historyReports.add(report);
+        report.setPortfolio(this);
     }
 
     @Override

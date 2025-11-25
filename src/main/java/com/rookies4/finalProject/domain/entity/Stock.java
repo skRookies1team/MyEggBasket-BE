@@ -32,8 +32,8 @@ public class Stock {
     @Column(name = "sector", length = 50)
     private String sector; // 섹터 (반도체, 2차전지 등)
 
-    @Column(name = "industry_code", length = 20)
-    private String industryCode; // 산업분류코드
+//    @Column(name = "industry_code", length = 20)
+//    private String industryCode; // 산업분류코드
 
     // 이 종목이 영향을 주는 관계들 (from_stock)
     @OneToMany(mappedBy = "fromStock", cascade = CascadeType.ALL, orphanRemoval = true)
@@ -45,6 +45,11 @@ public class Stock {
     @Builder.Default
     private List<StockRelations> incomingRelations = new ArrayList<>();
 
+    // 이 종목을 관심 종목으로 등록한 사용자 목록
+    @OneToMany(mappedBy = "stock", cascade = CascadeType.ALL, orphanRemoval = true)
+    @Builder.Default
+    private List<InterestStocks> interestedUsers = new ArrayList<>();
+
     // 연관관계 편의 메서드
     public void addOutgoingRelation(StockRelations relation) {
         outgoingRelations.add(relation);
@@ -54,6 +59,11 @@ public class Stock {
     public void addIncomingRelation(StockRelations relation) {
         incomingRelations.add(relation);
         relation.setToStock(this);
+    }
+
+    // 종목이 몇 명의 관심 종목으로 등록되었는지 계산
+    public int getInterestCount() {
+        return interestedUsers != null ? interestedUsers.size() : 0;
     }
 
     @Override

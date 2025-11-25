@@ -30,22 +30,19 @@ public class StockFeatures {
     @Column(name = "sentiment_score")
     private Float sentimentScore; // FinBERT 감성 점수 (-1.0 ~ 1.0)
 
-    @Column(name = "news_velocity")
-    private Float newsVelocity; // 뉴스 발생 빈도 (화제성)
+//    @Column(name = "news_velocity")
+//    private Float newsVelocity; // 뉴스 발생 빈도 (화제성)
 
     // === GNN 파생 피처 ===
     @Column(name = "centrality_score")
     private Float centralityScore; // 중심성 (시장에서 얼마나 중요한가)
 
-    @Column(name = "propagation_score")
-    private Float propagationScore; // 파급력 지수
+//    @Column(name = "propagation_score")
+//    private Float propagationScore; // 파급력 지수
 
     // === 기술적 지표 ===
     @Column(name = "volatility_atr")
     private Float volatilityAtr; // 변동성 (Average True Range)
-
-    @Column(name = "bid_ask_imbalance")
-    private Float bidAskImbalance; // 호가 불균형
 
     @Column(name = "risk_score")
     private Float riskScore; // 통합 리스크 점수 (0.0 ~ 1.0)
