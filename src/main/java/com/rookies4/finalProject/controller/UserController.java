@@ -10,19 +10,14 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 @RestController
-@RequestMapping("/api/users")
+@RequestMapping("/api/app/users")
 @RequiredArgsConstructor
 public class UserController {
 
     private final UserService userService;
 
-    // 1. 회원가입 (공개 엔드포인트)
-    @PostMapping
-    public ResponseEntity<UserDTO.UserResponse> createUser(@Valid @RequestBody UserDTO.SignUpRequest request) {
-        return ResponseEntity.status(HttpStatus.CREATED).body(userService.createUser(request));
-    }
 
-    // 2. 현재 로그인한 사용자 정보 조회
+    // 1. 현재 로그인한 사용자 정보 조회
     @GetMapping("/me")
     public ResponseEntity<UserDTO.UserResponse> getCurrentUser() {
         Long userId = SecurityUtil.getCurrentUserId();
@@ -32,7 +27,7 @@ public class UserController {
         return ResponseEntity.ok(userService.readUser(userId));
     }
 
-    // 3. 회원 조회 (ID로 조회)
+    // 2. 회원 조회 (ID로 조회)
     @GetMapping("/{userId}")
     public ResponseEntity<UserDTO.UserResponse> readUser(@PathVariable Long userId) {
         return ResponseEntity.ok(userService.readUser(userId));
