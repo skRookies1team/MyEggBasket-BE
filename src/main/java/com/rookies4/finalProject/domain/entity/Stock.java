@@ -55,4 +55,14 @@ public class Stock {
         incomingRelations.add(relation);
         relation.setToStock(this);
     }
+
+    @Override
+    public String toString() {
+        return "Stock{" +
+                "stockId=" + stockId +
+                ", ticker='" + ticker + '\'' +
+                ", name='" + name + '\'' +
+                ", sector='" + sector + '\'' +
+                '}';
+    }
 }

@@ -1,5 +1,6 @@
 package com.rookies4.finalProject.domain.entity;
 
+import com.rookies4.finalProject.domain.enums.RiskLevel;
 import jakarta.persistence.*;
 import lombok.*;
 
@@ -35,8 +36,9 @@ public class Portfolio {
     @Column(name = "cash_balance", precision = 20, scale = 2)
     private BigDecimal cashBalance; // 예수금 (사용 가능한 현금)
 
+    @Enumerated(EnumType.STRING)
     @Column(name = "risk_level", length = 20)
-    private String riskLevel; // 포트폴리오별 리스크 성향 (CONSERVATIVE, MODERATE, AGGRESSIVE)
+    private RiskLevel riskLevel;
 
     @Column(name = "created_at", nullable = false, updatable = false)
     private LocalDateTime createdAt;
@@ -65,5 +67,16 @@ public class Portfolio {
     public void addRecommendation(AIRecommendation recommendation) {
         recommendations.add(recommendation);
         recommendation.setPortfolio(this);
+    }
+
+    @Override
+    public String toString() {
+        return "Portfolio{" +
+                "portfolioId=" + portfolioId +
+                ", userId=" + (user != null ? user.getId() : null) +
+                ", name='" + name + '\'' +
+                ", totalAsset=" + totalAsset +
+                ", riskLevel='" + riskLevel + '\'' +
+                '}';
     }
 }

@@ -1,5 +1,6 @@
 package com.rookies4.finalProject.domain.entity;
 
+import com.rookies4.finalProject.domain.enums.RecommendationAction;
 import jakarta.persistence.*;
 import lombok.*;
 
@@ -28,8 +29,9 @@ public class AIRecommendation {
     @JoinColumn(name = "stock_id")
     private Stock stock;
 
+    @Enumerated(EnumType.STRING)
     @Column(name = "action_type", length = 10)
-    private String actionType; // BUY, SELL, HOLD
+    private RecommendationAction actionType; // BUY, SELL, HOLD
 
     @Column(name = "confidence_score")
     private Float confidenceScore; // AI 확신도 (0.0 ~ 1.0)
