@@ -49,9 +49,6 @@ public class PortfolioService {
                 .riskLevel(request.getRiskLevel())
                 .build();
 
-        applyHoldings(portfolio, request.getHoldings());
-
-
         return PortfolioDTO.PortfolioResponse.fromEntity(portfolioRepository.save(portfolio));
     }
     //2. Portfolio 전체 조회

@@ -72,30 +72,4 @@ public class PortfolioDTO {
                     .build();
         }
     }
-
-    @Data
-    @NoArgsConstructor
-    @AllArgsConstructor
-    @Builder
-    public static class HoldingRequest {
-        @NotNull(message = "종목 ID(stockId)는 필수입니다.")
-        private Long stockId;
-        @NotNull(message = "보유 수량(quantity)은 필수입니다.")
-        private Integer quantity;
-        private BigDecimal avgPrice;
-        private Float currentWeight;
-        private Float targetWeight;
-    }
-
-    @Data
-    @NoArgsConstructor
-    @AllArgsConstructor
-    @Builder
-    public static class HoldingResponse{
-        private Long holdingId;
-        private Portfolio portfolio;
-        private Stock stock;
-        private Integer quantity;
-    }
-
 }
