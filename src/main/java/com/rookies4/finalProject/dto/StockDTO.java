@@ -44,7 +44,7 @@ public class StockDTO {
                     .name(stock.getName())
                     .marketType(stock.getMarketType())
                     .sector(stock.getSector())
-                    .industryCode(stock.getIndustryCode())
+                    .industryCode(stock.get())
                     .build();
         }
     }

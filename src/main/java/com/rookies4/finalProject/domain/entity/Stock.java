@@ -32,8 +32,8 @@ public class Stock {
     @Column(name = "sector", length = 50)
     private String sector; // 섹터 (반도체, 2차전지 등)
 
-//    @Column(name = "industry_code", length = 20)
-//    private String industryCode; // 산업분류코드
+    @Column(name = "industry_code", length = 20)
+    private String industryCode; // 산업분류코드
 
     // 보유 내역
     @OneToMany(mappedBy = "stock", cascade = CascadeType.ALL, orphanRemoval = true)
