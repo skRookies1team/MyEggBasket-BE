@@ -16,9 +16,8 @@ public class HoldingDTO {
     @AllArgsConstructor
     @Builder
     public static class HoldingRequest {
-        private Long portfolioId;
         @NotNull(message = "종목 ID(stockId)는 필수입니다.")
-        private Long stockId;
+        private String ticker;
         @NotNull(message = "보유 수량(quantity)은 필수입니다.")
         private Integer quantity;
         private BigDecimal avgPrice;
