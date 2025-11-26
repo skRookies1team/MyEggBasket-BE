@@ -1,6 +1,8 @@
 package com.rookies4.finalProject.controller;
 
+import com.rookies4.finalProject.dto.HoldingDTO;
 import com.rookies4.finalProject.dto.PortfolioDTO;
+import com.rookies4.finalProject.service.HoldingService;
 import com.rookies4.finalProject.service.PortfolioService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -15,6 +17,7 @@ import java.util.List;
 @RequiredArgsConstructor
 public class PortfolioController {
     private final PortfolioService portfolioService;
+    private final HoldingService holdingService;
 
     //1. 포트폴리오 추가
     @PostMapping
@@ -44,10 +47,21 @@ public class PortfolioController {
         portfolioService.deletePortfolio(portfolioId);
         return ResponseEntity.noContent().build();
     }
-
-    //6. 포트폴리오 보유종목 조회
+//------------------------------------
+    //6. 포트폴리오 종목 추가
+    @PostMapping("/{portfolioId}/holdings")
+    public ResponseEntity<HoldingDTO.HoldingResponse> addHolding(@PathVariable Long portfolioId, @Valid @RequestBody HoldingDTO.HoldingRequest request){
+        return ResponseEntity.status(HttpStatus.CREATED).body(holdingService.addHolding(portfolioId,request));
+    }
+    //7. 포트폴리오 보유종목 조회
     @GetMapping("/{portfolioId}/holdings")
-    public ResponseEntity<PortfolioDTO.PortfolioHoldingResponse> readPortfolioHoldings(@PathVariable Long portfolioId){
-        return ResponseEntity.ok(portfolioService.readPortfolioHoldings(portfolioId));
+    public ResponseEntity<List<HoldingDTO.HoldingResponse>> readHoldings(@PathVariable Long portfolioId){
+        return ResponseEntity.ok(holdingService.readHoldings(portfolioId));
+    }
+
+    //8. 포트폴리오 보유종목 수정
+    @PutMapping("/{portfolioId}/holdings/{holdingId}")
+    public ResponseEntity<HoldingDTO.HoldingResponse> updateHolding(@PathVariable Long portfolioId,@PathVariable Long holdingId,  @Valid @RequestBody HoldingDTO.HoldingRequest request){
+        return ResponseEntity.ok(holdingService.updateHolding(portfolioId, holdingId, request));
     }
 }

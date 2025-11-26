@@ -4,7 +4,6 @@ import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.rookies4.finalProject.domain.entity.*;
 import com.rookies4.finalProject.domain.enums.RiskLevel;
 import jakarta.validation.constraints.NotBlank;
-import jakarta.validation.constraints.NotNull;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
@@ -32,28 +31,42 @@ public class PortfolioDTO {
     @NoArgsConstructor
     @AllArgsConstructor
     @Builder
+    @JsonIgnoreProperties(ignoreUnknown = true)
     public static class PortfolioResponse{
         private Long portfolioId;
-        private User user;
+        private Long userId; // User 엔티티 대신 userId만 포함
         private String name;
         private BigDecimal totalAsset;
         private BigDecimal cashBalance;
         private RiskLevel riskLevel;
-        private List<Holding> holdings;
-        private List<AIRecommendation> recommendations;
-        private List<HistoryReports> historyReports;
+        
+        // Holdings를 DTO로 변환하여 무한 참조 방지
+        private List<HoldingDTO.HoldingResponse> holdings;
+        
+        // Recommendations와 HistoryReports는 null로 설정 (필요시 별도 엔드포인트에서 조회)
+        // 무한 참조 방지를 위해 엔티티 리스트 대신 null 또는 간단한 정보만 포함
+        private List<AIRecommendation> recommendations = null;
+        private List<HistoryReports> historyReports = null;
 
         public static PortfolioDTO.PortfolioResponse fromEntity(Portfolio portfolio) {
+            // Holdings를 DTO로 변환
+            List<HoldingDTO.HoldingResponse> holdingsDto = null;
+            if (portfolio.getHoldings() != null && !portfolio.getHoldings().isEmpty()) {
+                holdingsDto = portfolio.getHoldings().stream()
+                        .map(HoldingDTO.HoldingResponse::fromEntity)
+                        .collect(java.util.stream.Collectors.toList());
+            }
+            
             return PortfolioResponse.builder()
                     .portfolioId(portfolio.getPortfolioId())
-                    .user(portfolio.getUser())
+                    .userId(portfolio.getUser() != null ? portfolio.getUser().getId() : null)
                     .name(portfolio.getName())
                     .totalAsset(portfolio.getTotalAsset())
                     .cashBalance(portfolio.getCashBalance())
                     .riskLevel(portfolio.getRiskLevel())
-                    .holdings(portfolio.getHoldings())
-                    .recommendations(portfolio.getRecommendations())
-                    .historyReports(portfolio.getHistoryReports())
+                    .holdings(holdingsDto)
+                    .recommendations(null) // 무한 참조 방지를 위해 null로 설정
+                    .historyReports(null) // 무한 참조 방지를 위해 null로 설정
                     .build();
         }
     }

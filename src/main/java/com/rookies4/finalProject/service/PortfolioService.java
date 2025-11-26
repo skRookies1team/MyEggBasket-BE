@@ -1,14 +1,11 @@
 package com.rookies4.finalProject.service;
 
-import com.rookies4.finalProject.domain.entity.Holding;
 import com.rookies4.finalProject.domain.entity.Portfolio;
-import com.rookies4.finalProject.domain.entity.Stock;
 import com.rookies4.finalProject.domain.entity.User;
 import com.rookies4.finalProject.dto.PortfolioDTO;
 import com.rookies4.finalProject.exception.BusinessException;
 import com.rookies4.finalProject.exception.ErrorCode;
 import com.rookies4.finalProject.repository.PortfolioRepository;
-import com.rookies4.finalProject.repository.StockRepository;
 import com.rookies4.finalProject.repository.UserRepository;
 import com.rookies4.finalProject.security.SecurityUtil;
 import lombok.RequiredArgsConstructor;
@@ -24,15 +21,10 @@ import java.util.stream.Collectors;
 @Transactional
 public class PortfolioService {
     private final PortfolioRepository portfolioRepository;
-    private final StockRepository stockRepository;
     private final UserRepository userRepository;
 
     //1. Portfolio 생성
     public PortfolioDTO.PortfolioResponse createPortfolio(PortfolioDTO.PortfolioRequest request){
-        if (portfolioRepository.existsByName(request.getName())){
-            throw new BusinessException(ErrorCode.BUSINESS_RULE_VIOLATION, "동일한 이름의 포트폴리오가 이미 존재합니다.");
-        }
-
         Long currentUserId = SecurityUtil.getCurrentUserId();
         if (currentUserId == null) {
             throw new BusinessException(ErrorCode.AUTH_ACCESS_DENIED, "로그인이 필요합니다.");
@@ -40,6 +32,11 @@ public class PortfolioService {
 
         User user = userRepository.findById(currentUserId)
                 .orElseThrow(() -> new BusinessException(ErrorCode.USER_NOT_FOUND, "로그인한 사용자를 찾을 수 없습니다."));
+
+        // 사용자별로 동일한 이름의 포트폴리오 존재 여부 확인
+        if (portfolioRepository.existsByNameAndUser(request.getName(), user)){
+            throw new BusinessException(ErrorCode.BUSINESS_RULE_VIOLATION, "동일한 이름의 포트폴리오가 이미 존재합니다.");
+        }
 
         Portfolio portfolio = Portfolio.builder()
                 .user(user)
@@ -51,10 +48,19 @@ public class PortfolioService {
 
         return PortfolioDTO.PortfolioResponse.fromEntity(portfolioRepository.save(portfolio));
     }
-    //2. Portfolio 전체 조회
+    
+    //2. Portfolio 전체 조회 (현재 사용자의 포트폴리오만)
     @Transactional(readOnly = true)
     public List<PortfolioDTO.PortfolioResponse> readPortfolios() {
-        return portfolioRepository.findAll()
+        Long currentUserId = SecurityUtil.getCurrentUserId();
+        if (currentUserId == null) {
+            throw new BusinessException(ErrorCode.AUTH_ACCESS_DENIED, "로그인이 필요합니다.");
+        }
+
+        User user = userRepository.findById(currentUserId)
+                .orElseThrow(() -> new BusinessException(ErrorCode.USER_NOT_FOUND, "로그인한 사용자를 찾을 수 없습니다."));
+
+        return portfolioRepository.findByUser(user)
                 .stream()
                 .map(PortfolioDTO.PortfolioResponse::fromEntity)
                 .collect(Collectors.toList());
@@ -64,16 +70,47 @@ public class PortfolioService {
     @Transactional(readOnly = true)
     public PortfolioDTO.PortfolioResponse readPortfolio(Long portfolioId){
         Portfolio portfolio = portfolioRepository.findById(portfolioId)
-                .orElseThrow(() -> new BusinessException(ErrorCode.PORTFOIO_NOT_FOUND));
+                .orElseThrow(() -> new BusinessException(ErrorCode.PORTFOLIO_NOT_FOUND));
+        
+        // 권한 확인: 포트폴리오 소유자만 조회 가능
+        validatePortfolioOwnership(portfolio);
+
+        if (portfolio.getUser() != null) {
+            portfolio.getUser().getId();
+        }
+        
+        // Holdings 컬렉션 초기화 및 각 Holding의 Stock 초기화
+        // DTO 변환 시 필요하므로 트랜잭션 내에서 초기화
+        if (portfolio.getHoldings() != null && !portfolio.getHoldings().isEmpty()) {
+            portfolio.getHoldings().forEach(holding -> {
+                if (holding.getStock() != null) {
+                    // Stock의 필요한 필드들을 접근하여 초기화
+                    holding.getStock().getStockId();
+                    holding.getStock().getTicker();
+                    holding.getStock().getName();
+                }
+            });
+        }
+        
         return PortfolioDTO.PortfolioResponse.fromEntity(portfolio);
     }
+    
     //4. Portfolio 수정
     public PortfolioDTO.PortfolioResponse updatePortfolio(Long portfolioId, PortfolioDTO.PortfolioRequest updateRequest){
         Portfolio portfolio = portfolioRepository.findById(portfolioId)
-                .orElseThrow(() -> new BusinessException(ErrorCode.PORTFOIO_NOT_FOUND));
+                .orElseThrow(() -> new BusinessException(ErrorCode.PORTFOLIO_NOT_FOUND));
+
+        // 권한 확인: 포트폴리오 소유자만 수정 가능
+        validatePortfolioOwnership(portfolio);
+
+        Long currentUserId = SecurityUtil.getCurrentUserId();
+        User user = userRepository.findById(currentUserId)
+                .orElseThrow(() -> new BusinessException(ErrorCode.USER_NOT_FOUND, "로그인한 사용자를 찾을 수 없습니다."));
 
         if (updateRequest.getName() != null && !updateRequest.getName().isBlank()) {
-            if (!updateRequest.getName().equals(portfolio.getName()) && portfolioRepository.existsByName(updateRequest.getName())) {
+            // 이름이 변경되는 경우, 현재 사용자 내에서 중복 확인
+            if (!updateRequest.getName().equals(portfolio.getName()) && 
+                portfolioRepository.existsByNameAndUser(updateRequest.getName(), user)) {
                 throw new BusinessException(ErrorCode.BUSINESS_RULE_VIOLATION, "동일한 이름의 포트폴리오가 이미 존재합니다.");
             }
             portfolio.setName(updateRequest.getName());
@@ -90,46 +127,44 @@ public class PortfolioService {
 
         return PortfolioDTO.PortfolioResponse.fromEntity(portfolio);
     }
+    
     //5. Portfolio 삭제
     public void deletePortfolio(Long portfolioId) {
-        if (! portfolioRepository.existsById(portfolioId)) {
-            throw new BusinessException(ErrorCode.PORTFOIO_NOT_FOUND);
-        }
+        Portfolio portfolio = portfolioRepository.findById(portfolioId)
+                .orElseThrow(() -> new BusinessException(ErrorCode.PORTFOLIO_NOT_FOUND));
+        
+        // 권한 확인: 포트폴리오 소유자만 삭제 가능
+        validatePortfolioOwnership(portfolio);
+        
         portfolioRepository.deleteById(portfolioId);
     }
-    //6. Portfolio 보유 종목 조회
+    
+    //6. 포트폴리오 보유종목 조회
     @Transactional(readOnly = true)
     public PortfolioDTO.PortfolioHoldingResponse readPortfolioHoldings(Long portfolioId) {
         Portfolio portfolio = portfolioRepository.findById(portfolioId)
-                .orElseThrow(() -> new BusinessException(ErrorCode.PORTFOIO_NOT_FOUND));
+                .orElseThrow(() -> new BusinessException(ErrorCode.PORTFOLIO_NOT_FOUND));
+        
+        // 권한 확인: 포트폴리오 소유자만 조회 가능
+        validatePortfolioOwnership(portfolio);
+        
         return PortfolioDTO.PortfolioHoldingResponse.fromEntity(portfolio);
     }
-
+    
+    // 헬퍼 메서드: BigDecimal이 null인 경우 0으로 변환
     private BigDecimal defaultZero(BigDecimal value) {
         return value != null ? value : BigDecimal.ZERO;
     }
-
-    private void applyHoldings(Portfolio portfolio, List<PortfolioDTO.HoldingRequest> holdingRequests) {
-        if (holdingRequests == null || holdingRequests.isEmpty()) {
-            return;
+    
+    // 권한 확인 헬퍼 메서드
+    private void validatePortfolioOwnership(Portfolio portfolio) {
+        Long currentUserId = SecurityUtil.getCurrentUserId();
+        if (currentUserId == null) {
+            throw new BusinessException(ErrorCode.AUTH_ACCESS_DENIED, "로그인이 필요합니다.");
         }
-
-        holdingRequests.forEach(holdingRequest -> {
-            Stock stock = stockRepository.findById(holdingRequest.getStockId())
-                    .orElseThrow(() -> new BusinessException(
-                            ErrorCode.TICKER_NOT_FOUND,
-                            "stockId " + holdingRequest.getStockId() + " 에 해당하는 종목을 찾을 수 없습니다."
-                    ));
-
-            Holding holding = Holding.builder()
-                    .stock(stock)
-                    .quantity(holdingRequest.getQuantity())
-                    .avgPrice(holdingRequest.getAvgPrice())
-                    .currentWeight(holdingRequest.getCurrentWeight())
-                    .targetWeight(holdingRequest.getTargetWeight())
-                    .build();
-            portfolio.addHolding(holding);
-        });
+        
+        if (!portfolio.getUser().getId().equals(currentUserId)) {
+            throw new BusinessException(ErrorCode.AUTH_ACCESS_DENIED, "해당 포트폴리오에 대한 접근 권한이 없습니다.");
+        }
     }
-
 }
