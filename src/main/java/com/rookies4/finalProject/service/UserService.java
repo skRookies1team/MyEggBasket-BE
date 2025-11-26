@@ -32,17 +32,18 @@ public class UserService {
             throw new BusinessException(ErrorCode.USER_ID_DUPLICATE, "이미 사용 중인 이메일입니다.");
         }
 
-        // 3. 비밀번호 암호화
+        // 3. 비밀번호, Appkey, AppSecret 암호화
         String encodedPassword = passwordEncoder.encode(request.getPassword());
+        String encodedAppkey = passwordEncoder.encode(request.getAppkey());
+        String encodedAppsecret= passwordEncoder.encode(request.getAppsecret());
 
         // 4. User 엔티티 생성
         User user = User.builder()
                 .email(request.getEmail())
                 .password(encodedPassword) // 암호화된 비밀번호 저장
                 .username(request.getUsername())
-                .appkey(request.getAppkey())
-                .appsecret(request.getAppsecret())
-                // riskProfileScore, fcmToken 등 누락된 필드는 null로 저장됨 (DTO에 포함되지 않았으므로)
+                .appkey(encodedAppkey)
+                .appsecret(encodedAppsecret)
                 .build();
 
         // 5. DB 저장 및 응답 DTO 변환
