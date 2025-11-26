@@ -68,7 +68,7 @@ public class Stock {
     // 이 종목을 관심 종목으로 등록한 사용자 목록
     @OneToMany(mappedBy = "stock", cascade = CascadeType.ALL, orphanRemoval = true)
     @Builder.Default
-    private List<InterestStocks> interestedUsers = new ArrayList<>();
+    private List<InterestStock> interestedUsers = new ArrayList<>();
 
     // 연관관계 편의 메서드
     public void addOutgoingRelation(StockRelations relation) {
