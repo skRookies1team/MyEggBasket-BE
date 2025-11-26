@@ -1,6 +1,7 @@
 package com.rookies4.finalProject.domain.entity;
 
 import jakarta.persistence.*;
+import jakarta.validation.constraints.Email;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
@@ -23,6 +24,7 @@ public class User {
 
     // email(VARCHAR(100))에 매핑
     // 이메일
+    @Email
     @Column(name = "email", length = 100, nullable = false, unique=true)
     private String email;
 
