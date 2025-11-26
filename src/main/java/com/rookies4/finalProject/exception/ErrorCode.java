@@ -45,6 +45,11 @@ public enum ErrorCode {
     STOCK_TICKER_DUPLICATE("STOCK_001", "중복된 종목입니다.", HttpStatus.CONFLICT),
     TICKER_NOT_FOUND("STOCK_002","해당 종목을 찾을 수 없습니다.",HttpStatus.CONFLICT),
 
+    //-----------------------------------------------------
+    // 포트폴리오 관련
+    //-----------------------------------------------------
+    PORTFOLIO_NOT_FOUND("PORTFOLIO_001","해당 포트폴리오를 찾을 수 없습니다",HttpStatus.CONFLICT),
+
     // 🔹 서버 오류 (500)
     // ----------------------------------------------------
     INTERNAL_SERVER_ERROR("SERVER_001", "서버 내부 오류가 발생했습니다.", HttpStatus.INTERNAL_SERVER_ERROR),
