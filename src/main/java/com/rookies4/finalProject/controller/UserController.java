@@ -46,4 +46,10 @@ public class UserController {
         userService.deleteUser(userId);
         return ResponseEntity.noContent().build();
     }
+
+    // 6. 완료된 거래 내역 조회
+    @GetMapping("/{userId}/transactions")
+    public ResponseEntity<UserDTO.UserResponse> getCompletedTransactions() {
+        return ResponseEntity.ok(userService.getCompletedTransactions());
+    }
 }
