@@ -9,6 +9,7 @@ import com.rookies4.finalProject.exception.BusinessException;
 import com.rookies4.finalProject.exception.ErrorCode;
 import com.rookies4.finalProject.repository.TransactionRepository;
 import com.rookies4.finalProject.repository.UserRepository;
+import com.rookies4.finalProject.security.SecurityUtil;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
@@ -137,10 +138,21 @@ public class UserService {
      */
     @Transactional(readOnly = true)
     public List<TransactionDTO.Response> getUserOrders(Long userId, String statusParam ) {
-        // 1. 사용자 검증
+        // 1. 인증/권한 체크
+        Long currentUserId = SecurityUtil.getCurrentUserId();
+        if (currentUserId == null) {
+            throw new BusinessException(ErrorCode.UNAUTHORIZED, "로그인이 필요합니다.");
+        }
+
+        // 본인만 조회 가능
+        if (!currentUserId.equals(userId)) {
+            throw new BusinessException(ErrorCode.AUTH_ACCESS_DENIED, "접근 권한이 없습니다.");
+        }
+
         if (!userRepository.existsById(userId)) {
             throw new BusinessException(ErrorCode.USER_NOT_FOUND, "해당 ID의 사용자를 찾을 수 없습니다.");
         }
+
         List<Transaction> transactions;
 
         // 2. status 파라미터 유무에 따른 분기 처리
