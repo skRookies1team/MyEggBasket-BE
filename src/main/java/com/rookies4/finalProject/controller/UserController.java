@@ -1,9 +1,12 @@
 package com.rookies4.finalProject.controller;
 
+import com.rookies4.finalProject.dto.TransactionDTO;
+import com.rookies4.finalProject.dto.TransactionDTO.Response;
 import com.rookies4.finalProject.dto.UserDTO;
 import com.rookies4.finalProject.security.SecurityUtil;
 import com.rookies4.finalProject.service.UserService;
 import jakarta.validation.Valid;
+import java.util.List;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -47,9 +50,10 @@ public class UserController {
         return ResponseEntity.noContent().build();
     }
 
-    // 6. 완료된 거래 내역 조회
+    // 6. 완료된 거래 내역 조회 (userId로 조회)
     @GetMapping("/{userId}/transactions")
-    public ResponseEntity<UserDTO.UserResponse> getCompletedTransactions() {
-        return ResponseEntity.ok(userService.getCompletedTransactions());
+    public ResponseEntity<List<Response>> getCompletedTransactions(@PathVariable Long userId) {
+        List<TransactionDTO.Response> transactions = userService.getCompletedTransactions(userId);
+        return ResponseEntity.ok(transactions);
     }
 }
