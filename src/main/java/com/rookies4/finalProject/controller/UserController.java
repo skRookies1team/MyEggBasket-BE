@@ -1,5 +1,6 @@
 package com.rookies4.finalProject.controller;
 
+import com.rookies4.finalProject.domain.enums.TransactionStatus;
 import com.rookies4.finalProject.dto.TransactionDTO;
 import com.rookies4.finalProject.dto.TransactionDTO.Response;
 import com.rookies4.finalProject.dto.UserDTO;
@@ -50,10 +51,16 @@ public class UserController {
         return ResponseEntity.noContent().build();
     }
 
-    // 6. 완료된 거래 내역 조회 (userId로 조회)
-    @GetMapping("/{userId}/transactions")
-    public ResponseEntity<List<Response>> getCompletedTransactions(@PathVariable Long userId) {
-        List<TransactionDTO.Response> transactions = userService.getCompletedTransactions(userId);
-        return ResponseEntity.ok(transactions);
+    // 6. 주문/거래 내역 조회
+    // GET /api/app/users/{userId}/orders?status=pending (미체결)
+    // GET /api/app/users/{userId}/orders?status=completed (체결)
+    // GET /api/app/users/{userId}/orders?status=cancelled (취소)
+    // GET /api/app/users/{userId}/orders (전체)
+    @GetMapping("/{userId}/orders")
+    public ResponseEntity<List<TransactionDTO.Response>> getUserOrders (
+            @PathVariable Long userId,
+            @RequestParam(required = false) String status) { // status 는 필수 아님(nullable)
+
+        return ResponseEntity.ok(userService.getUserOrders(userId, status));
     }
 }
