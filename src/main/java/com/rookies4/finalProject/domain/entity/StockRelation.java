@@ -10,7 +10,7 @@ import lombok.*;
 @NoArgsConstructor
 @AllArgsConstructor
 @Builder
-public class StockRelations {
+public class StockRelation {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
