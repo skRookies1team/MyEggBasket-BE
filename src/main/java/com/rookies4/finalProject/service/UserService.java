@@ -2,8 +2,8 @@ package com.rookies4.finalProject.service;
 
 import com.rookies4.finalProject.domain.entity.Transaction;
 import com.rookies4.finalProject.domain.entity.User;
+import com.rookies4.finalProject.domain.enums.TransactionStatus;
 import com.rookies4.finalProject.dto.TransactionDTO;
-import com.rookies4.finalProject.dto.TransactionDTO.Response;
 import com.rookies4.finalProject.dto.UserDTO;
 import com.rookies4.finalProject.exception.BusinessException;
 import com.rookies4.finalProject.exception.ErrorCode;
@@ -127,21 +127,37 @@ public class UserService {
         userRepository.deleteById(userId);
     }
 
-    // --- 5. Get Completed Transactions (완료된 거래 내역 조회) ---
+    // --- 5. Get User Orders (주문 내역 조회) ---
     /**
-     * 사용자 ID를 기반으로 완료된 거래 내역을 조회합니다.
+     * 사용자의 주문 내역을 조회합니다.
+     * status 파라미터가 있으면 해당 상태(PENDING, COMPLETED, CANCELLED)만, 없으면 전체 내역을 조회합니다.
      * @param userId 사용자 ID
+     * @param statusParam 거래 상태(PENDING, COMPLETED, CANCELED)
      * @return 거래 내역 DTO 리스트
      */
     @Transactional(readOnly = true)
-    public List<Response> getCompletedTransactions(Long userId) {
-        // 1. 사용자 존재 여부 확인
+    public List<TransactionDTO.Response> getUserOrders(Long userId, String statusParam ) {
+        // 1. 사용자 검증
         if (!userRepository.existsById(userId)) {
             throw new BusinessException(ErrorCode.USER_NOT_FOUND, "해당 ID의 사용자를 찾을 수 없습니다.");
         }
+        List<Transaction> transactions;
 
-        // 2. 거래 내역 조회 (최신순)
-        List<Transaction> transactions = transactionRepository.findByUser_IdOrderByExecutedAtDesc(userId);
+        // 2. status 파라미터 유무에 따른 분기 처리
+        if (statusParam != null && !statusParam.isBlank()) {
+            try {
+                // String 을 Enum 으로 변환 (대소문자 무시)
+                TransactionStatus status = TransactionStatus.valueOf(statusParam.toUpperCase());
+                // 상태값과 함께 조회
+                transactions = transactionRepository.findByUser_IdAndStatusOrderByExecutedAtDesc(userId, status);
+            } catch (IllegalArgumentException e) {
+                // 유효하지 않은 status 값이 들어올 경우 예외 처리
+                throw new BusinessException(ErrorCode.VALIDATION_ERROR, "유효하지 않은 주문 상태값입니다." + statusParam);
+            }
+        } else {
+            // 파라미터가 없으면 전체 조회
+            transactions = transactionRepository.findByUser_IdOrderByExecutedAtDesc(userId);
+        }
 
         // 3. DTO 변환 후 반환
         return transactions.stream()
