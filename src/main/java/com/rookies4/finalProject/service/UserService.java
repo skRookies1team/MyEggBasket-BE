@@ -92,11 +92,18 @@ public class UserService {
             user.setUsername(request.getUsername());
         }
         if (request.getAppkey() != null) {
-            user.setAppkey(request.getAppkey());
+            String encodedAppkey = passwordEncoder.encode(request.getAppkey());
+            user.setAppkey(encodedAppkey);
         }
         if (request.getAppsecret() != null) {
-            user.setAppsecret(request.getAppsecret());
+            String encodedAppsecret= passwordEncoder.encode(request.getAppsecret());
+            user.setAppsecret(encodedAppsecret);
         }
+        if(request.getPassword().equals(user.getPassword())){
+            String encodedPassword = passwordEncoder.encode(request.getNewPassword());
+            user.setPassword(encodedPassword);
+        }
+
         // FcmToken, RiskProfileScore 등 다른 필드도 업데이트 로직 추가 가능
 
         // save()를 명시적으로 호출하지 않아도 @Transactional에 의해 변경 내용이 반영됩니다 (Dirty Checking).
