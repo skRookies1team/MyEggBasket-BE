@@ -1,9 +1,13 @@
 package com.rookies4.finalProject.controller;
 
+import com.rookies4.finalProject.domain.enums.TransactionStatus;
+import com.rookies4.finalProject.dto.TransactionDTO;
+import com.rookies4.finalProject.dto.TransactionDTO.Response;
 import com.rookies4.finalProject.dto.UserDTO;
 import com.rookies4.finalProject.security.SecurityUtil;
 import com.rookies4.finalProject.service.UserService;
 import jakarta.validation.Valid;
+import java.util.List;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -45,5 +49,18 @@ public class UserController {
     public ResponseEntity<Void> deleteUser(@PathVariable Long userId) {
         userService.deleteUser(userId);
         return ResponseEntity.noContent().build();
+    }
+
+    // 6. 주문/거래 내역 조회
+    // GET /api/app/users/{userId}/orders?status=pending (미체결)
+    // GET /api/app/users/{userId}/orders?status=completed (체결)
+    // GET /api/app/users/{userId}/orders?status=cancelled (취소)
+    // GET /api/app/users/{userId}/orders (전체)
+    @GetMapping("/{userId}/orders")
+    public ResponseEntity<List<TransactionDTO.Response>> getUserOrders (
+            @PathVariable Long userId,
+            @RequestParam(required = false) String status) { // status 는 필수 아님(nullable)
+
+        return ResponseEntity.ok(userService.getUserOrders(userId, status));
     }
 }

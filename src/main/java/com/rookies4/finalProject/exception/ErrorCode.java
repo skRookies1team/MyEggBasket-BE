@@ -37,6 +37,7 @@ public enum ErrorCode {
     USER_NOT_FOUND("USER_001", "사용자를 찾을 수 없습니다.", HttpStatus.NOT_FOUND),
     USER_ID_DUPLICATE("USER_002", "중복된 아이디입니다.", HttpStatus.CONFLICT),
     USER_NAME_DUPLICATE("USER_003", "중복된 이름입니다.", HttpStatus.CONFLICT),
+    UNAUTHORIZED("USER_04", "로그인이 필요합니다.", HttpStatus.UNAUTHORIZED),
 
 
     //-----------------------------------------------------

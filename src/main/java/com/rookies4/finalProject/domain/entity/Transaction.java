@@ -1,5 +1,6 @@
 package com.rookies4.finalProject.domain.entity;
 
+import com.rookies4.finalProject.domain.enums.TransactionStatus;
 import com.rookies4.finalProject.domain.enums.TransactionType;
 import com.rookies4.finalProject.domain.enums.TriggerSource;
 import jakarta.persistence.*;
@@ -40,6 +41,10 @@ public class Transaction {
     @Column(name = "price", precision = 20, scale = 2)
     private BigDecimal price; // 체결 가격
 
+    @Enumerated(EnumType.STRING)
+    @Column(name = "status", length = 20, nullable = false)
+    private TransactionStatus status;
+
 //    @Column(name = "fee", precision = 10, scale = 2)
 //    private BigDecimal fee; // 수수료
 //
@@ -57,6 +62,11 @@ public class Transaction {
     protected void onCreate() {
         if (this.executedAt == null) {
             this.executedAt = LocalDateTime.now();
+        }
+
+        // status 가 설정되지 않았다면 기본적으로 'PENDING' 으로 설정
+        if (this.status == null) {
+            this.status = TransactionStatus.COMPLETED;
         }
     }
 
