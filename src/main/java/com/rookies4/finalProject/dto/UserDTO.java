@@ -89,6 +89,8 @@ public class UserDTO {
     public static class UpdateRequest {
         // 이름은 null일 경우 수정하지 않도록 Optional 필드로 간주
         private String username;
+        private String password;
+        private String newPassword;
         private String appkey;
         private String appsecret;
         // 다른 수정 가능한 필드 추가 가능 (예: fcmToken)
