@@ -1,14 +1,21 @@
 package com.rookies4.finalProject.service;
 
+import com.rookies4.finalProject.domain.entity.Transaction;
 import com.rookies4.finalProject.domain.entity.User;
+import com.rookies4.finalProject.dto.TransactionDTO;
+import com.rookies4.finalProject.dto.TransactionDTO.Response;
 import com.rookies4.finalProject.dto.UserDTO;
 import com.rookies4.finalProject.exception.BusinessException;
 import com.rookies4.finalProject.exception.ErrorCode;
+import com.rookies4.finalProject.repository.TransactionRepository;
 import com.rookies4.finalProject.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+
+import java.util.List;
+import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
@@ -16,6 +23,7 @@ import org.springframework.transaction.annotation.Transactional;
 public class UserService {
     private final UserRepository userRepository;
     private final PasswordEncoder passwordEncoder;
+    private final TransactionRepository transactionRepository;
 
     // --- 1. Create User (회원가입) ---
     @Transactional
@@ -117,5 +125,27 @@ public class UserService {
             throw new BusinessException(ErrorCode.USER_NOT_FOUND, "삭제하려는 사용자를 찾을 수 없습니다.");
         }
         userRepository.deleteById(userId);
+    }
+
+    // --- 5. Get Completed Transactions (완료된 거래 내역 조회) ---
+    /**
+     * 사용자 ID를 기반으로 완료된 거래 내역을 조회합니다.
+     * @param userId 사용자 ID
+     * @return 거래 내역 DTO 리스트
+     */
+    @Transactional(readOnly = true)
+    public List<Response> getCompletedTransactions(Long userId) {
+        // 1. 사용자 존재 여부 확인
+        if (!userRepository.existsById(userId)) {
+            throw new BusinessException(ErrorCode.USER_NOT_FOUND, "해당 ID의 사용자를 찾을 수 없습니다.");
+        }
+
+        // 2. 거래 내역 조회 (최신순)
+        List<Transaction> transactions = transactionRepository.findByUser_IdOrderByExecutedAtDesc(userId);
+
+        // 3. DTO 변환 후 반환
+        return transactions.stream()
+                .map(TransactionDTO.Response::fromEntity)
+                .collect(Collectors.toList());
     }
 }
