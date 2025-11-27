@@ -58,12 +58,12 @@ public class Stock {
     // 이 종목이 영향을 주는 관계들 (from_stock)
     @OneToMany(mappedBy = "fromStock", cascade = CascadeType.ALL, orphanRemoval = true)
     @Builder.Default
-    private List<StockRelations> outgoingRelations = new ArrayList<>();
+    private List<StockRelation> outgoingRelations = new ArrayList<>();
 
     // 이 종목이 영향을 받는 관계들 (to_stock)
     @OneToMany(mappedBy = "toStock", cascade = CascadeType.ALL, orphanRemoval = true)
     @Builder.Default
-    private List<StockRelations> incomingRelations = new ArrayList<>();
+    private List<StockRelation> incomingRelations = new ArrayList<>();
 
     // 이 종목을 관심 종목으로 등록한 사용자 목록
     @OneToMany(mappedBy = "stock", cascade = CascadeType.ALL, orphanRemoval = true)
@@ -71,12 +71,12 @@ public class Stock {
     private List<InterestStock> interestedUsers = new ArrayList<>();
 
     // 연관관계 편의 메서드
-    public void addOutgoingRelation(StockRelations relation) {
+    public void addOutgoingRelation(StockRelation relation) {
         outgoingRelations.add(relation);
         relation.setFromStock(this);
     }
 
-    public void addIncomingRelation(StockRelations relation) {
+    public void addIncomingRelation(StockRelation relation) {
         incomingRelations.add(relation);
         relation.setToStock(this);
     }
