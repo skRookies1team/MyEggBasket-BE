@@ -7,8 +7,9 @@ import java.util.Base64;
 import java.util.Map;
 
 import com.rookies4.finalProject.config.KisApiConfig;
+import com.rookies4.finalProject.domain.entity.KisAuthToken;
 import com.rookies4.finalProject.domain.entity.User;
-import com.rookies4.finalProject.dto.KisAuthDTO;
+import com.rookies4.finalProject.dto.KisAuthTokenDTO;
 import com.rookies4.finalProject.exception.BusinessException;
 import com.rookies4.finalProject.exception.ErrorCode;
 import com.rookies4.finalProject.repository.UserRepository;
@@ -73,7 +74,7 @@ public class KisAuthService {
 	 * @return KIS 토큰 응답
 	 */
 	@Transactional(readOnly = true)
-	public KisAuthDTO.KisTokenResponse issueToken(boolean useVirtualServer, User user) {
+	public KisAuthTokenDTO.KisTokenResponse issueToken(boolean useVirtualServer, User user) {
 
         String path = "/oauth2/tokenP";
 
@@ -110,10 +111,10 @@ public class KisAuthService {
 
 		try {
 			log.info("KIS 토큰 발급 요청: URI={}, Virtual={}", uri, useVirtualServer);
-			ResponseEntity<KisAuthDTO.KisTokenResponse> response =
-					restTemplate.exchange(uri, HttpMethod.POST, request, KisAuthDTO.KisTokenResponse.class);
+			ResponseEntity<KisAuthTokenDTO.KisTokenResponse> response =
+					restTemplate.exchange(uri, HttpMethod.POST, request, KisAuthTokenDTO.KisTokenResponse.class);
 			
-			KisAuthDTO.KisTokenResponse body = response.getBody();
+			KisAuthTokenDTO.KisTokenResponse body = response.getBody();
 			if (body == null) {
 				log.error("KIS 토큰 응답 본문이 비어있습니다.");
 				throw new BusinessException(ErrorCode.KIS_TOKEN_ISSUANCE_FAILED, 
@@ -121,7 +122,15 @@ public class KisAuthService {
 			}
 
 			log.info("KIS 토큰 발급 성공: TokenType={}, ExpiresIn={}", body.getTokenType(), body.getExpiresIn());
-			return body;
+            KisAuthToken kisAuthToken = KisAuthToken.builder()
+                    .accessToken(body.getAccessToken())
+                    .tokenType(body.getTokenType())
+                    .expiresIn(body.getExpiresIn())
+                    .accessTokenTokenExpired(body.getAccessTokenExpired())
+                    .build();
+
+            return body;
+
 		} catch (RestClientResponseException e) {
 			log.error("KIS 토큰 발급 실패 (HTTP {}): {}", e.getStatusCode(), e.getResponseBodyAsString(), e);
 			throw new BusinessException(ErrorCode.KIS_TOKEN_ISSUANCE_FAILED, 
