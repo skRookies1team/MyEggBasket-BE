@@ -18,7 +18,7 @@ public class InterestStockDTO {
     @Builder
     public static class InterestStockRequest{
         @NotNull(message = "관심 종목으로 등록할 주식을 선택해 주세요.")
-        private Long stockId;
+        private String stockCode;
         private String memo;
     }
 

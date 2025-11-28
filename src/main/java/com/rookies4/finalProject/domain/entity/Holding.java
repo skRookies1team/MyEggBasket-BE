@@ -28,7 +28,7 @@ public class Holding {
     private Portfolio portfolio;
 
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "stock_id")
+    @JoinColumn(name = "stock_code")
     private Stock stock;
 
     @Column(name = "quantity", nullable = false)
@@ -48,7 +48,7 @@ public class Holding {
         return "Holding{" +
                 "holdingId=" + holdingId +
                 ", portfolioId=" + (portfolio != null ? portfolio.getPortfolioId() : null) +
-                ", stockId=" + (stock != null ? stock.getStockId() : null) +
+                ", stockCode=" + (stock != null ? stock.getStockCode() : null) +
                 ", quantity=" + quantity +
                 ", avgPrice=" + avgPrice +
                 ", currentWeight=" + currentWeight +

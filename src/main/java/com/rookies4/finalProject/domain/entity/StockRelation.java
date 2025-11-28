@@ -10,7 +10,7 @@ import lombok.*;
 @NoArgsConstructor
 @AllArgsConstructor
 @Builder
-public class StockRelations {
+public class StockRelation {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -19,12 +19,12 @@ public class StockRelations {
 
     // 원인 종목 (영향을 주는 종목, 예: 엔비디아)
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "from_stock_id")
+    @JoinColumn(name = "from_stock_code")
     private Stock fromStock;
 
     // 결과 종목 (영향을 받는 종목, 예: SK하이닉스)
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "to_stock_id")
+    @JoinColumn(name = "to_stock_code")
     private Stock toStock;
 
     @Column(name = "relation_type", length = 50)
@@ -41,8 +41,8 @@ public class StockRelations {
     public String toString() {
         return "StockRelation{" +
                 "relationId=" + relationId +
-                ", fromStockId=" + (fromStock != null ? fromStock.getStockId() : null) +
-                ", toStockId=" + (toStock != null ? toStock.getStockId() : null) +
+                ", fromStockCode=" + (fromStock != null ? fromStock.getStockCode() : null) +
+                ", toStockCode=" + (toStock != null ? toStock.getStockCode() : null) +
                 ", relationType='" + relationType + '\'' +
                 ", weight=" + weight +
                 '}';

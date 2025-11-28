@@ -27,7 +27,7 @@ public class HoldingService {
 
     //1. 보유 종목 추가
     public HoldingDTO.HoldingResponse addHolding(Long portfolioId, HoldingDTO.HoldingRequest request){
-        Stock stock = stockRepository.findByTicker(request.getTicker())
+        Stock stock = stockRepository.findByStockCode(request.getStockCode())
                 .orElseThrow(() -> new BusinessException(ErrorCode.TICKER_NOT_FOUND));
 
         Portfolio portfolio = portfolioRepository.findById(portfolioId)
@@ -56,8 +56,7 @@ public class HoldingService {
         
         // 저장된 Holding의 Stock이 제대로 초기화되었는지 확인
         if (savedHolding.getStock() != null) {
-            savedHolding.getStock().getStockId();
-            savedHolding.getStock().getTicker();
+            savedHolding.getStock().getStockCode();
             savedHolding.getStock().getName();
         }
 
@@ -79,8 +78,7 @@ public class HoldingService {
         holdings.forEach(holding -> {
             if (holding.getStock() != null) {
                 // Stock의 기본 필드들을 접근하여 초기화
-                holding.getStock().getStockId();
-                holding.getStock().getTicker();
+                holding.getStock().getStockCode();
                 holding.getStock().getName();
             }
         });

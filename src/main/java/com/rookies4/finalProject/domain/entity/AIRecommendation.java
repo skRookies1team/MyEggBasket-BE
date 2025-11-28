@@ -26,7 +26,7 @@ public class AIRecommendation {
     private Portfolio portfolio;
 
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "stock_id")
+    @JoinColumn(name = "stock_code")
     private Stock stock;
 
     @Enumerated(EnumType.STRING)
@@ -61,7 +61,7 @@ public class AIRecommendation {
         return "AIRecommendation{" +
                 "recoId=" + recoId +
                 ", portfolioId=" + (portfolio != null ? portfolio.getPortfolioId() : null) +
-                ", stockId=" + (stock != null ? stock.getStockId() : null) +
+                ", stockCode=" + (stock != null ? stock.getStockCode() : null) +
                 ", actionType='" + actionType + '\'' +
                 ", confidenceScore=" + confidenceScore +
                 ", createdAt=" + createdAt +

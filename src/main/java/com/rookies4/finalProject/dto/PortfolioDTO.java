@@ -46,7 +46,7 @@ public class PortfolioDTO {
         // Recommendations와 HistoryReports는 null로 설정 (필요시 별도 엔드포인트에서 조회)
         // 무한 참조 방지를 위해 엔티티 리스트 대신 null 또는 간단한 정보만 포함
         private List<AIRecommendation> recommendations = null;
-        private List<HistoryReports> historyReports = null;
+        private List<HistoryReport> historyReports = null;
 
         public static PortfolioDTO.PortfolioResponse fromEntity(Portfolio portfolio) {
             // Holdings를 DTO로 변환

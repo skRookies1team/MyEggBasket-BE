@@ -5,7 +5,6 @@ import jakarta.persistence.*;
 import lombok.*;
 
 import java.math.BigDecimal;
-import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -53,7 +52,7 @@ public class Portfolio {
     // 히스토리 리포트 목록
     @OneToMany(mappedBy = "portfolio", cascade = CascadeType.ALL, orphanRemoval = true)
     @Builder.Default
-    private List<HistoryReports> historyReports = new ArrayList<>();
+    private List<HistoryReport> historyReports = new ArrayList<>();
 
     // 연관관계 편의 메서드
     public void addHolding(Holding holding) {
@@ -67,7 +66,7 @@ public class Portfolio {
     }
 
     // 연관관계 편의 메서드
-    public void addHistoryReport(HistoryReports report) {
+    public void addHistoryReport(HistoryReport report) {
         historyReports.add(report);
         report.setPortfolio(this);
     }

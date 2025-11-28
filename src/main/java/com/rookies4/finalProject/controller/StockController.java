@@ -21,8 +21,8 @@ public class StockController {
     }
     
     //2. 주식 정보 조회
-    @GetMapping("/{ticker}")
-    public ResponseEntity<StockDTO.StockResponse> readStock(@PathVariable String ticker){
-        return ResponseEntity.ok(stockService.readStock(ticker));
+    @GetMapping("/{stockCode}")
+    public ResponseEntity<StockDTO.StockResponse> readStock(@PathVariable String stockCode){
+        return ResponseEntity.ok(stockService.readStock(stockCode));
     }
 }

@@ -6,7 +6,7 @@ import java.time.LocalDateTime;
 
 @Entity
 @Table(name = "interest_stocks", indexes = {
-        @Index(name = "idx_user_stock", columnList = "user_id, stock_id", unique = true),
+        @Index(name = "idx_user_stock", columnList = "user_id, stock_code", unique = true),
         @Index(name = "idx_user_added", columnList = "user_id, added_at DESC")
 })
 @Getter
@@ -26,7 +26,7 @@ public class InterestStock {
     private User user;
 
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "stock_id", nullable = false)
+    @JoinColumn(name = "stock_code", nullable = false)
     private Stock stock;
 
     @Column(name = "added_at", nullable = false)
@@ -52,7 +52,7 @@ public class InterestStock {
         return "InterestStock{" +
                 "interestId=" + interestId +
                 ", userId=" + (user != null ? user.getId() : null) +
-                ", stockId=" + (stock != null ? stock.getStockId() : null) +
+                ", stockCode=" + (stock != null ? stock.getStockCode() : null) +
                 ", addedAt=" + addedAt +
                 ", displayOrder=" + displayOrder +
                 '}';
