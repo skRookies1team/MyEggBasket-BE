@@ -57,6 +57,7 @@ public class UserService {
                 .username(request.getUsername())
                 .appkey(encodedAppkey) // Base64 인코딩된 appkey 저장
                 .appsecret(encodedAppsecret) // Base64 인코딩된 appsecret 저장
+                .account(request.getAccount())
                 .build();
 
         // 5. DB 저장 및 응답 DTO 변환
