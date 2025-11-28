@@ -29,9 +29,9 @@ public class InterestStockController {
     }
 
     //3. 관심 종목 삭제
-    @DeleteMapping("/{interestStockId}")
-    public ResponseEntity<Void> deleteInterestStock(@PathVariable Long interestStockId){
-        interestStockService.deleteInterestStock(interestStockId);
+    @DeleteMapping("/{stockCode}")
+    public ResponseEntity<Void> deleteInterestStock(@PathVariable String stockCode){
+        interestStockService.deleteInterestStock(stockCode);
         return ResponseEntity.noContent().build();
     }
 }

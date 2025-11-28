@@ -59,10 +59,12 @@ public class InterestStockService {
     }
 
     //3. 관심종목 삭제
-    public void deleteInterestStock(Long interestStockId){
+    public void deleteInterestStock(String stockCode){
         User user = getCurrentUser();
-        InterestStock interestStock = interestStockRepository.findById(interestStockId)
-                .orElseThrow(() -> new BusinessException(ErrorCode.BUSINESS_RULE_VIOLATION,"관심 종목을 찾을 수 없습니다."));
+        Stock stock = stockRepository.findByStockCode(stockCode)
+                .orElseThrow(()-> new BusinessException(ErrorCode.TICKER_NOT_FOUND));
+        InterestStock interestStock = interestStockRepository.findByUserAndStock(user,stock)
+                .orElseThrow(()-> new BusinessException(ErrorCode.BUSINESS_RULE_VIOLATION,"관심 종목을 찾을 수 없습니다."));
 
         if (!interestStock.getUser().getId().equals(user.getId())) {
             throw new BusinessException(ErrorCode.AUTH_ACCESS_DENIED, "해당 관심 종목에 대한 삭제 권한이 없습니다.");
