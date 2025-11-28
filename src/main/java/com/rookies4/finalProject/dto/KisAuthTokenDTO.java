@@ -1,15 +1,18 @@
 package com.rookies4.finalProject.dto;
 
+import com.fasterxml.jackson.annotation.JsonFormat;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
+import java.time.LocalDateTime;
+
 /**
  * KIS API 인증 관련 DTO
  */
-public class KisAuthDTO {
+public class KisAuthTokenDTO {
 
     /**
      * KIS API 토큰 발급 응답 DTO
@@ -31,7 +34,7 @@ public class KisAuthDTO {
         
         private String scope;
         
-        @JsonProperty("access_token_expired")
+        @JsonProperty("access_token_token_expired")
         private String accessTokenExpired;
     }
 }

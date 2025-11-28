@@ -1,7 +1,7 @@
 package com.rookies4.finalProject.controller;
 
 import com.rookies4.finalProject.domain.entity.User;
-import com.rookies4.finalProject.dto.KisAuthDTO;
+import com.rookies4.finalProject.dto.KisAuthTokenDTO;
 import com.rookies4.finalProject.exception.BusinessException;
 import com.rookies4.finalProject.exception.ErrorCode;
 import com.rookies4.finalProject.repository.UserRepository;
@@ -33,7 +33,7 @@ public class KisAuthController {
 	 * @return KIS 토큰 응답
 	 */
 	@PostMapping("/token")
-	public ResponseEntity<KisAuthDTO.KisTokenResponse> issueToken(
+	public ResponseEntity<KisAuthTokenDTO.KisTokenResponse> issueToken(
 			@RequestParam(name = "virtual", defaultValue = "false") boolean useVirtualServer) {
 		
 		// 현재 로그인한 사용자 확인
