@@ -51,6 +51,14 @@ public enum ErrorCode {
     //-----------------------------------------------------
     PORTFOLIO_NOT_FOUND("PORTFOLIO_001","해당 포트폴리오를 찾을 수 없습니다",HttpStatus.CONFLICT),
 
+    //-----------------------------------------------------
+    // KIS API 관련
+    //-----------------------------------------------------
+    KIS_API_KEY_NOT_FOUND("KIS_001", "KIS API 키가 설정되지 않았습니다.", HttpStatus.BAD_REQUEST),
+    KIS_API_SECRET_NOT_FOUND("KIS_002", "KIS API Secret이 설정되지 않았습니다.", HttpStatus.BAD_REQUEST),
+    KIS_TOKEN_ISSUANCE_FAILED("KIS_003", "KIS 인증 토큰 발급에 실패했습니다.", HttpStatus.BAD_GATEWAY),
+    KIS_API_ERROR("KIS_004", "KIS API 호출 중 오류가 발생했습니다.", HttpStatus.BAD_GATEWAY),
+
     // 🔹 서버 오류 (500)
     // ----------------------------------------------------
     INTERNAL_SERVER_ERROR("SERVER_001", "서버 내부 오류가 발생했습니다.", HttpStatus.INTERNAL_SERVER_ERROR),
