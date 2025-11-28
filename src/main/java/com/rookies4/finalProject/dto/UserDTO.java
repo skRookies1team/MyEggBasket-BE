@@ -30,9 +30,14 @@ public class UserDTO {
         @NotBlank(message = "사용자 이름은 필수 입력 항목입니다.")
         private String username;
 
+        @NotBlank(message = "KIS appkey를 입력해주세요")
         private String appkey;
 
+        @NotBlank(message = "KIS appsecret을 입력해주세요")
         private String appsecret;
+
+        @NotBlank(message = "한국투자증권 계좌번호 앞 8자리를 입력해주세요")
+        private String account;
 
     }
 
@@ -60,9 +65,6 @@ public class UserDTO {
         private Long id;
         private String email;
         private String username;
-        private String appkey;
-        private String appsecret;
-        private String fcmToken;
         private LocalDateTime createdAt;
         private LocalDateTime updatedAt;
 
@@ -72,9 +74,6 @@ public class UserDTO {
                     .id(user.getId())
                     .email(user.getEmail())
                     .username(user.getUsername())
-                    .appkey(user.getAppkey())
-                    .appsecret(user.getAppsecret())
-                    .fcmToken(user.getFcmToken())
                     .createdAt(user.getCreatedAt())
                     .updatedAt(user.getUpdatedAt())
                     .build();
@@ -89,6 +88,8 @@ public class UserDTO {
     public static class UpdateRequest {
         // 이름은 null일 경우 수정하지 않도록 Optional 필드로 간주
         private String username;
+        private String password;
+        private String newPassword;
         private String appkey;
         private String appsecret;
         // 다른 수정 가능한 필드 추가 가능 (예: fcmToken)

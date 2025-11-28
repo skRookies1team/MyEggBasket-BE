@@ -1,14 +1,24 @@
 package com.rookies4.finalProject.service;
 
+import com.rookies4.finalProject.domain.entity.Transaction;
 import com.rookies4.finalProject.domain.entity.User;
+import com.rookies4.finalProject.domain.enums.TransactionStatus;
+import com.rookies4.finalProject.dto.TransactionDTO;
 import com.rookies4.finalProject.dto.UserDTO;
 import com.rookies4.finalProject.exception.BusinessException;
 import com.rookies4.finalProject.exception.ErrorCode;
+import com.rookies4.finalProject.repository.TransactionRepository;
 import com.rookies4.finalProject.repository.UserRepository;
+import com.rookies4.finalProject.security.SecurityUtil;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+
+import java.nio.charset.StandardCharsets;
+import java.util.Base64;
+import java.util.List;
+import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
@@ -16,6 +26,8 @@ import org.springframework.transaction.annotation.Transactional;
 public class UserService {
     private final UserRepository userRepository;
     private final PasswordEncoder passwordEncoder;
+    private final TransactionRepository transactionRepository;
+    
 
     // --- 1. Create User (회원가입) ---
     @Transactional
@@ -32,17 +44,20 @@ public class UserService {
             throw new BusinessException(ErrorCode.USER_ID_DUPLICATE, "이미 사용 중인 이메일입니다.");
         }
 
-        // 3. 비밀번호 암호화
+        // 3. 비밀번호, Appkey, AppSecret 암호화
         String encodedPassword = passwordEncoder.encode(request.getPassword());
+
+        String encodedAppkey = encodeBase64(request.getAppkey());
+        String encodedAppsecret = encodeBase64(request.getAppsecret());
 
         // 4. User 엔티티 생성
         User user = User.builder()
                 .email(request.getEmail())
                 .password(encodedPassword) // 암호화된 비밀번호 저장
                 .username(request.getUsername())
-                .appkey(request.getAppkey())
-                .appsecret(request.getAppsecret())
-                // riskProfileScore, fcmToken 등 누락된 필드는 null로 저장됨 (DTO에 포함되지 않았으므로)
+                .appkey(encodedAppkey) // Base64 인코딩된 appkey 저장
+                .appsecret(encodedAppsecret) // Base64 인코딩된 appsecret 저장
+                .account(request.getAccount())
                 .build();
 
         // 5. DB 저장 및 응답 DTO 변환
@@ -91,11 +106,18 @@ public class UserService {
             user.setUsername(request.getUsername());
         }
         if (request.getAppkey() != null) {
-            user.setAppkey(request.getAppkey());
+            String encodedAppkey = encodeBase64(request.getAppkey());
+            user.setAppkey(encodedAppkey);
         }
         if (request.getAppsecret() != null) {
-            user.setAppsecret(request.getAppsecret());
+            String encodedAppsecret = encodeBase64(request.getAppsecret());
+            user.setAppsecret(encodedAppsecret);
         }
+        if(request.getPassword().equals(user.getPassword())){
+            String encodedPassword = passwordEncoder.encode(request.getNewPassword());
+            user.setPassword(encodedPassword);
+        }
+
         // FcmToken, RiskProfileScore 등 다른 필드도 업데이트 로직 추가 가능
 
         // save()를 명시적으로 호출하지 않아도 @Transactional에 의해 변경 내용이 반영됩니다 (Dirty Checking).
@@ -116,5 +138,66 @@ public class UserService {
             throw new BusinessException(ErrorCode.USER_NOT_FOUND, "삭제하려는 사용자를 찾을 수 없습니다.");
         }
         userRepository.deleteById(userId);
+    }
+
+    // --- 5. Get User Orders (주문 내역 조회) ---
+    /**
+     * 사용자의 주문 내역을 조회합니다.
+     * status 파라미터가 있으면 해당 상태(PENDING, COMPLETED, CANCELLED)만, 없으면 전체 내역을 조회합니다.
+     * @param userId 사용자 ID
+     * @param statusParam 거래 상태(PENDING, COMPLETED, CANCELED)
+     * @return 거래 내역 DTO 리스트
+     */
+    @Transactional(readOnly = true)
+    public List<TransactionDTO.Response> getUserOrders(Long userId, String statusParam ) {
+        // 1. 인증/권한 체크
+        Long currentUserId = SecurityUtil.getCurrentUserId();
+        if (currentUserId == null) {
+            throw new BusinessException(ErrorCode.UNAUTHORIZED, "로그인이 필요합니다.");
+        }
+
+        // 본인만 조회 가능
+        if (!currentUserId.equals(userId)) {
+            throw new BusinessException(ErrorCode.AUTH_ACCESS_DENIED, "접근 권한이 없습니다.");
+        }
+
+        if (!userRepository.existsById(userId)) {
+            throw new BusinessException(ErrorCode.USER_NOT_FOUND, "해당 ID의 사용자를 찾을 수 없습니다.");
+        }
+
+        List<Transaction> transactions;
+
+        // 2. status 파라미터 유무에 따른 분기 처리
+        if (statusParam != null && !statusParam.isBlank()) {
+            try {
+                // String 을 Enum 으로 변환 (대소문자 무시)
+                TransactionStatus status = TransactionStatus.valueOf(statusParam.toUpperCase());
+                // 상태값과 함께 조회
+                transactions = transactionRepository.findByUser_IdAndStatusOrderByExecutedAtDesc(userId, status);
+            } catch (IllegalArgumentException e) {
+                // 유효하지 않은 status 값이 들어올 경우 예외 처리
+                throw new BusinessException(ErrorCode.VALIDATION_ERROR, "유효하지 않은 주문 상태값입니다." + statusParam);
+            }
+        } else {
+            // 파라미터가 없으면 전체 조회
+            transactions = transactionRepository.findByUser_IdOrderByExecutedAtDesc(userId);
+        }
+
+        // 3. DTO 변환 후 반환
+        return transactions.stream()
+                .map(TransactionDTO.Response::fromEntity)
+                .collect(Collectors.toList());
+    }
+
+    /**
+     * Base64로 문자열을 인코딩합니다.
+     * @param plainText 인코딩할 문자열 (null일 수 있음)
+     * @return Base64로 인코딩된 문자열 (입력이 null이면 null 반환)
+     */
+    private String encodeBase64(String plainText) {
+        if (plainText == null || plainText.isEmpty()) {
+            return plainText;
+        }
+        return Base64.getEncoder().encodeToString(plainText.getBytes(StandardCharsets.UTF_8));
     }
 }
