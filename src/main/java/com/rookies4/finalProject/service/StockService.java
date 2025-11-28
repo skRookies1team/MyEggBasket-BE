@@ -19,11 +19,11 @@ public class StockService {
     //1. 주식 기본 정보 삽입
     @Transactional
     public StockDTO.StockResponse createStock(StockDTO.StockRequest request){
-        if(stockRepository.existsByTicker(request.getTicker())){
+        if(stockRepository.existsByStockCode(request.getStockCode())){
             throw new BusinessException(ErrorCode.STOCK_TICKER_DUPLICATE);
         }
         Stock stock = Stock.builder()
-                .ticker(request.getTicker())
+                .stockCode(request.getStockCode())
                 .name(request.getName())
                 .marketType(request.getMarketType())
                 .sector(request.getSector())
@@ -33,8 +33,8 @@ public class StockService {
     }
 
     //2. 주식 정보 조회
-    public StockDTO.StockResponse readStock(String ticker){
-        Stock stock = stockRepository.findByTicker(ticker)
+    public StockDTO.StockResponse readStock(String stockCode){
+        Stock stock = stockRepository.findByStockCode(stockCode)
                 .orElseThrow(() -> new BusinessException(ErrorCode.TICKER_NOT_FOUND));
         return StockDTO.StockResponse.fromEntity(stock);
     }

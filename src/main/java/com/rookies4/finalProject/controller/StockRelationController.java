@@ -23,15 +23,15 @@ public class StockRelationController {
     }
 
     //2. stockRelation fromStock에 대해 조회
-    @GetMapping("from/{ticker}")
+    @GetMapping("from/{stockCode}")
     public ResponseEntity<List<StockRelationDTO.StockRelationResponse>> readFromStockRelation(
-            @PathVariable String ticker){
-        return ResponseEntity.ok(stockRelationService.readFromStockRelation(ticker));
+            @PathVariable String stockCode){
+        return ResponseEntity.ok(stockRelationService.readFromStockRelation(stockCode));
     }
     //3. stockRelation toStock에 대해 조회
-    @GetMapping("to/{ticker}")
+    @GetMapping("to/{stockCode}")
     public ResponseEntity<List<StockRelationDTO.StockRelationResponse>> readToStockRelation(
-            @PathVariable String ticker){
-        return ResponseEntity.ok(stockRelationService.readToStockRelation(ticker));
+            @PathVariable String stockCode){
+        return ResponseEntity.ok(stockRelationService.readToStockRelation(stockCode));
     }
 }

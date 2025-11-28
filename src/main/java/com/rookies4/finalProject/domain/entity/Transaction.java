@@ -28,7 +28,7 @@ public class Transaction {
     private User user;
 
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "stock_id")
+    @JoinColumn(name = "stock_code")
     private Stock stock;
 
     @Enumerated(EnumType.STRING)
@@ -75,7 +75,7 @@ public class Transaction {
         return "Transaction{" +
                 "transactionId=" + transactionId +
                 ", userId=" + (user != null ? user.getId() : null) +
-                ", stockId=" + (stock != null ? stock.getStockId() : null) +
+                ", stockCode=" + (stock != null ? stock.getStockCode() : null) +
                 ", type='" + type + '\'' +
                 ", quantity=" + quantity +
                 ", price=" + price +

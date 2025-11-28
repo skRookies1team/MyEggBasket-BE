@@ -20,7 +20,7 @@ public class StockFeatures {
     private Long featureId;
 
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "stock_id")
+    @JoinColumn(name = "stock_code")
     private Stock stock;
 
     @Column(name = "reference_date")
@@ -51,7 +51,7 @@ public class StockFeatures {
     public String toString() {
         return "StockFeatures{" +
                 "featureId=" + featureId +
-                ", stockId=" + (stock != null ? stock.getStockId() : null) +
+                ", stockCode=" + (stock != null ? stock.getStockCode() : null) +
                 ", referenceDate=" + referenceDate +
                 ", sentimentScore=" + sentimentScore +
                 ", centralityScore=" + centralityScore +

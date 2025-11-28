@@ -14,8 +14,8 @@ public class StockRelationDTO {
     @AllArgsConstructor
     @Builder
     public static class StockRelationRequest{
-        private String fromStockTicker;
-        private String toStockTicker;
+        private String fromStockCode;
+        private String toStockCode;
         private String relationType;
         private float weight;
     }
@@ -25,16 +25,16 @@ public class StockRelationDTO {
     @AllArgsConstructor
     @Builder
     public static class StockRelationResponse{
-        private String fromStockTicker;
-        private String toStockTicker;
+        private String fromStockCode;
+        private String toStockCode;
         private String relationType;
         private float weight;
 
         public static StockRelationDTO.StockRelationResponse fromEntity(StockRelation stockRelation){
 
             return StockRelationResponse.builder()
-                    .fromStockTicker(stockRelation.getFromStock().getTicker())
-                    .toStockTicker(stockRelation.getToStock().getTicker())
+                    .fromStockCode(stockRelation.getFromStock().getStockCode())
+                    .toStockCode(stockRelation.getToStock().getStockCode())
                     .relationType(stockRelation.getRelationType())
                     .weight(stockRelation.getWeight())
                     .build();

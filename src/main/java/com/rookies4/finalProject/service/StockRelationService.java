@@ -23,10 +23,10 @@ public class StockRelationService {
 
     //1. StockRelation 생성
     public StockRelationDTO.StockRelationResponse createStockRelation(StockRelationDTO.StockRelationRequest request){
-        Stock fromStock = stockRepository.findByTicker(request.getFromStockTicker())
+        Stock fromStock = stockRepository.findByStockCode(request.getFromStockCode())
                 .orElseThrow(() -> new BusinessException(ErrorCode.TICKER_NOT_FOUND));
 
-        Stock toStock = stockRepository.findByTicker(request.getToStockTicker())
+        Stock toStock = stockRepository.findByStockCode(request.getToStockCode())
                 .orElseThrow(() -> new BusinessException(ErrorCode.TICKER_NOT_FOUND));
 
         StockRelation stockRelation = StockRelation.builder()
@@ -41,8 +41,8 @@ public class StockRelationService {
 
     //2. FromStock 기준 조회
     @Transactional(readOnly = true)
-    public List<StockRelationDTO.StockRelationResponse> readFromStockRelation(String ticker){
-        Stock fromStock = stockRepository.findByTicker(ticker)
+    public List<StockRelationDTO.StockRelationResponse> readFromStockRelation(String stockCode){
+        Stock fromStock = stockRepository.findByStockCode(stockCode)
                 .orElseThrow(() -> new BusinessException(ErrorCode.TICKER_NOT_FOUND));
         return stockRelationRepository.findByFromStock(fromStock)
                 .stream()
@@ -51,8 +51,8 @@ public class StockRelationService {
     }
     //3. ToStock 기준 조회
     @Transactional(readOnly = true)
-    public List<StockRelationDTO.StockRelationResponse> readToStockRelation(String ticker){
-        Stock toStock = stockRepository.findByTicker(ticker)
+    public List<StockRelationDTO.StockRelationResponse> readToStockRelation(String stockCode){
+        Stock toStock = stockRepository.findByStockCode(stockCode)
                 .orElseThrow(() -> new BusinessException(ErrorCode.TICKER_NOT_FOUND));
         return stockRelationRepository.findByToStock(toStock)
                 .stream()

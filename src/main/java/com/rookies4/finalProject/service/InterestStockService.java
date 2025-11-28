@@ -30,7 +30,7 @@ public class InterestStockService {
     public InterestStockDTO.InterestStockResponse addInterestStock(InterestStockDTO.InterestStockRequest request){
         User user = getCurrentUser();
 
-        Stock stock = stockRepository.findById(request.getStockId())
+        Stock stock = stockRepository.findByStockCode(request.getStockCode())
                 .orElseThrow(() -> new BusinessException(ErrorCode.TICKER_NOT_FOUND, "관심 종목으로 등록할 주식을 찾을 수 없습니다."));
 
         if (interestStockRepository.existsByUserAndStock(user, stock)) {

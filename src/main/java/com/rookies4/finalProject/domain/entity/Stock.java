@@ -15,13 +15,10 @@ import java.util.List;
 @Builder
 public class Stock {
 
-    @Id
-    @GeneratedValue(strategy = GenerationType.IDENTITY)
-    @Column(name = "stock_id")
-    private Long stockId;
 
-    @Column(name = "ticker", nullable = false, unique = true, length = 20)
-    private String ticker; // 종목코드 (예: 005930)
+    @Id
+    @Column(name = "stock_code", nullable = false, unique = true, length = 20)
+    private String stockCode; // 종목코드 (예: 005930)
 
     @Column(name = "name", nullable = false, length = 100)
     private String name; // 종목명 (예: 삼성전자)
@@ -89,9 +86,9 @@ public class Stock {
     @Override
     public String toString() {
         return "Stock{" +
-                "stockId=" + stockId +
-                ", ticker='" + ticker + '\'' +
+                "stockCode='" + stockCode + '\'' +
                 ", name='" + name + '\'' +
+                ", marketType='" + marketType + '\'' +
                 ", sector='" + sector + '\'' +
                 '}';
     }

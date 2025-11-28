@@ -85,8 +85,7 @@ public class PortfolioService {
             portfolio.getHoldings().forEach(holding -> {
                 if (holding.getStock() != null) {
                     // Stock의 필요한 필드들을 접근하여 초기화
-                    holding.getStock().getStockId();
-                    holding.getStock().getTicker();
+                    holding.getStock().getStockCode();
                     holding.getStock().getName();
                 }
             });

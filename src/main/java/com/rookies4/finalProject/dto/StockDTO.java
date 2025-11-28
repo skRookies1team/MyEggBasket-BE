@@ -17,7 +17,7 @@ public class StockDTO {
     @AllArgsConstructor
     @Builder
     public static class StockRequest{
-        private String ticker; // 종목코드 (예: 005930)
+        private String stockCode; // 종목코드 (예: 005930)
         private String name; // 종목명 (예: 삼성전자)
         private String marketType; // KOSPI, KOSDAQ
         private String sector; // 섹터 (반도체, 2차전지 등)
@@ -29,8 +29,7 @@ public class StockDTO {
     @AllArgsConstructor
     @Builder
     public static class StockResponse{
-        private Long stockId;
-        private String ticker; // 종목코드 (예: 005930)
+        private String stockCode; // 종목코드 (예: 005930)
         private String name; // 종목명 (예: 삼성전자)
         private String marketType; // KOSPI, KOSDAQ
         private String sector; // 섹터 (반도체, 2차전지 등)
@@ -39,8 +38,7 @@ public class StockDTO {
         // Entity를 DTO로 변환하는 생성자
         public static StockDTO.StockResponse fromEntity(Stock stock) {
             return StockResponse.builder()
-                    .stockId(stock.getStockId())
-                    .ticker(stock.getTicker())
+                    .stockCode(stock.getStockCode())
                     .name(stock.getName())
                     .marketType(stock.getMarketType())
                     .sector(stock.getSector())

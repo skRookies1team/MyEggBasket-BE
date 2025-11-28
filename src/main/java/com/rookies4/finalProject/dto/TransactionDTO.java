@@ -21,9 +21,8 @@ public class TransactionDTO {
         private Long transactionId;
 
         // Stock 정보 매핑
-        private Long stockId; // 종목 ID
+        private String stockCode; // 종목코드
         private String stockName; // 종목명
-        private String ticker; // 종목코드
 
         // 거래 정보
         private TransactionType type; // BUY, SELL
@@ -45,9 +44,8 @@ public class TransactionDTO {
         public static Response fromEntity(Transaction transaction) {
             return Response.builder()
                     .transactionId(transaction.getTransactionId())
-                    .stockId(transaction.getStock() != null ? transaction.getStock().getStockId() : null)
+                    .stockCode(transaction.getStock() != null ? transaction.getStock().getStockCode() : null)
                     .stockName(transaction.getStock() != null ? transaction.getStock().getName() : null)
-                    .ticker(transaction.getStock() != null ? transaction.getStock().getTicker() : null)
 
                     .type(transaction.getType())
                     .typeDescription(transaction.getType().getDescription())
