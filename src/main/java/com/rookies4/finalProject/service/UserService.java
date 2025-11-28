@@ -15,6 +15,8 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.nio.charset.StandardCharsets;
+import java.util.Base64;
 import java.util.List;
 import java.util.stream.Collectors;
 
@@ -25,6 +27,7 @@ public class UserService {
     private final UserRepository userRepository;
     private final PasswordEncoder passwordEncoder;
     private final TransactionRepository transactionRepository;
+    
 
     // --- 1. Create User (회원가입) ---
     @Transactional
@@ -43,16 +46,17 @@ public class UserService {
 
         // 3. 비밀번호, Appkey, AppSecret 암호화
         String encodedPassword = passwordEncoder.encode(request.getPassword());
-        String encodedAppkey = passwordEncoder.encode(request.getAppkey());
-        String encodedAppsecret= passwordEncoder.encode(request.getAppsecret());
+
+        String encodedAppkey = encodeBase64(request.getAppkey());
+        String encodedAppsecret = encodeBase64(request.getAppsecret());
 
         // 4. User 엔티티 생성
         User user = User.builder()
                 .email(request.getEmail())
                 .password(encodedPassword) // 암호화된 비밀번호 저장
                 .username(request.getUsername())
-                .appkey(encodedAppkey)
-                .appsecret(encodedAppsecret)
+                .appkey(encodedAppkey) // Base64 인코딩된 appkey 저장
+                .appsecret(encodedAppsecret) // Base64 인코딩된 appsecret 저장
                 .build();
 
         // 5. DB 저장 및 응답 DTO 변환
@@ -101,11 +105,11 @@ public class UserService {
             user.setUsername(request.getUsername());
         }
         if (request.getAppkey() != null) {
-            String encodedAppkey = passwordEncoder.encode(request.getAppkey());
+            String encodedAppkey = encodeBase64(request.getAppkey());
             user.setAppkey(encodedAppkey);
         }
         if (request.getAppsecret() != null) {
-            String encodedAppsecret= passwordEncoder.encode(request.getAppsecret());
+            String encodedAppsecret = encodeBase64(request.getAppsecret());
             user.setAppsecret(encodedAppsecret);
         }
         if(request.getPassword().equals(user.getPassword())){
@@ -182,5 +186,17 @@ public class UserService {
         return transactions.stream()
                 .map(TransactionDTO.Response::fromEntity)
                 .collect(Collectors.toList());
+    }
+
+    /**
+     * Base64로 문자열을 인코딩합니다.
+     * @param plainText 인코딩할 문자열 (null일 수 있음)
+     * @return Base64로 인코딩된 문자열 (입력이 null이면 null 반환)
+     */
+    private String encodeBase64(String plainText) {
+        if (plainText == null || plainText.isEmpty()) {
+            return plainText;
+        }
+        return Base64.getEncoder().encodeToString(plainText.getBytes(StandardCharsets.UTF_8));
     }
 }
