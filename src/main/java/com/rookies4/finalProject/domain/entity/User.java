@@ -48,6 +48,9 @@ public class User {
     @Column(name = "appsecret", length = 255)
     private String appsecret;
 
+    @Column(name="account", length = 8)
+    private String account;
+
     // fcm_token(VARCHAR(255))에 매핑
     // FCM 토큰
     @Column(name = "fcm_token", length = 255)
