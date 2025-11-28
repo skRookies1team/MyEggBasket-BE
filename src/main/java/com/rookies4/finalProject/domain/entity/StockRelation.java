@@ -10,7 +10,7 @@ import lombok.*;
 @NoArgsConstructor
 @AllArgsConstructor
 @Builder
-public class StockRelations {
+public class StockRelation {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -19,12 +19,12 @@ public class StockRelations {
 
     // 원인 종목 (영향을 주는 종목, 예: 엔비디아)
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "from_stock_id")
+    @JoinColumn(name = "from_stock_code")
     private Stock fromStock;
 
     // 결과 종목 (영향을 받는 종목, 예: SK하이닉스)
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "to_stock_id")
+    @JoinColumn(name = "to_stock_code")
     private Stock toStock;
 
     @Column(name = "relation_type", length = 50)
@@ -33,16 +33,16 @@ public class StockRelations {
     @Column(name = "weight")
     private Float weight; // 관계 강도 (0.0 ~ 1.0, GNN 학습 가중치)
 
-    @Column(name = "description", columnDefinition = "TEXT")
-    private String description; // 관계 설명 (예: "HBM 독점 공급")
+//    @Column(name = "description", columnDefinition = "TEXT")
+//    private String description; // 관계 설명 (예: "HBM 독점 공급")
 
     // toString에서 무한 루프 방지
     @Override
     public String toString() {
         return "StockRelation{" +
                 "relationId=" + relationId +
-                ", fromStockId=" + (fromStock != null ? fromStock.getStockId() : null) +
-                ", toStockId=" + (toStock != null ? toStock.getStockId() : null) +
+                ", fromStockCode=" + (fromStock != null ? fromStock.getStockCode() : null) +
+                ", toStockCode=" + (toStock != null ? toStock.getStockCode() : null) +
                 ", relationType='" + relationType + '\'' +
                 ", weight=" + weight +
                 '}';
