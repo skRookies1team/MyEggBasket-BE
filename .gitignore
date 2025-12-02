@@ -34,3 +34,9 @@ build/
 
 ## properties file
 src/main/resources/
+
+## master stock file
+data/data_stock.csv
+data/data_sector_KOSDOQ.csv
+data/data_sector_KOSPI.csv
+data/data_industry_code.csv
