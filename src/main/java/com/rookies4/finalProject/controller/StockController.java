@@ -8,6 +8,8 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
+import java.util.List;
+
 @RestController
 @RequestMapping("/api/app/stocks")
 @RequiredArgsConstructor
@@ -24,5 +26,10 @@ public class StockController {
     @GetMapping("/{stockCode}")
     public ResponseEntity<StockDTO.StockResponse> readStock(@PathVariable String stockCode){
         return ResponseEntity.ok(stockService.readStock(stockCode));
+    }
+
+    @GetMapping("/search")
+    public ResponseEntity<List<StockDTO.StockResponse>> searchStocks(@RequestParam String keyword) {
+        return ResponseEntity.ok(stockService.searchStocks(keyword));
     }
 }
