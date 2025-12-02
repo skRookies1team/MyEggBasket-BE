@@ -1,9 +1,10 @@
 package com.rookies4.finalProject.config;
 
-import com.rookies4.finalProject.service.KisAuthService;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import java.time.Duration;
+import org.springframework.boot.web.client.RestTemplateBuilder;
+import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.web.client.RestTemplate;
 import org.springframework.web.util.UriComponentsBuilder;
 
 import java.net.URI;
@@ -21,6 +22,14 @@ public class KisApiConfig {
 
     // 모의투자 서버 Base URL
 	private static final String VIRTUAL_BASE_URL = "https://openapivts.koreainvestment.com:29443";
+
+	@Bean
+	public RestTemplate restTemplate(RestTemplateBuilder builder) {
+		return builder
+				.setConnectTimeout(Duration.ofSeconds(5)) // 연결 시간 초과 5초
+				.setReadTimeout(Duration.ofSeconds(10)) // 읽기 시간 초과 10초
+				.build();
+	}
 
 	/**
 	 * API 엔드포인트 URI를 생성합니다.
