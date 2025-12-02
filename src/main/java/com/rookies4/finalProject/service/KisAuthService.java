@@ -12,6 +12,7 @@ import com.rookies4.finalProject.domain.entity.User;
 import com.rookies4.finalProject.dto.KisAuthTokenDTO;
 import com.rookies4.finalProject.exception.BusinessException;
 import com.rookies4.finalProject.exception.ErrorCode;
+import com.rookies4.finalProject.repository.KisAuthRepository;
 import com.rookies4.finalProject.repository.UserRepository;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -39,32 +40,16 @@ public class KisAuthService {
 
 	private final RestTemplate restTemplate;
 	private final UserRepository userRepository;
+    private final KisAuthRepository kisAuthRepository;
 
 	public KisAuthService(RestTemplateBuilder restTemplateBuilder,
-			UserRepository userRepository) {
+			UserRepository userRepository, KisAuthRepository kisAuthRepository) {
 		this.restTemplate = restTemplateBuilder
 				.setConnectTimeout(Duration.ofSeconds(5))
 				.setReadTimeout(Duration.ofSeconds(10))
 				.build();
 		this.userRepository = userRepository;
-	}
-
-	/**
-	 * Base64로 인코딩된 문자열을 디코딩합니다.
-	 * @param encoded 인코딩된 문자열
-	 * @return 디코딩된 문자열
-	 */
-	private String decodeBase64(String encoded) {
-		if (encoded == null || encoded.isEmpty()) {
-			return encoded;
-		}
-		try {
-			byte[] decodedBytes = Base64.getDecoder().decode(encoded);
-			return new String(decodedBytes, StandardCharsets.UTF_8);
-		} catch (IllegalArgumentException e) {
-			log.warn("Base64 디코딩 실패, 원본 값 사용: {}", e.getMessage());
-			return encoded; // 디코딩 실패 시 원본 반환
-		}
+        this.kisAuthRepository = kisAuthRepository;
 	}
 
 	/**
@@ -73,7 +58,6 @@ public class KisAuthService {
 	 * @param user 사용자 엔티티
 	 * @return KIS 토큰 응답
 	 */
-	@Transactional(readOnly = true)
 	public KisAuthTokenDTO.KisTokenResponse issueToken(boolean useVirtualServer, User user) {
 
         String path = "/oauth2/tokenP";
@@ -85,7 +69,7 @@ public class KisAuthService {
 
 		// API 키 검증
 		if (!StringUtils.hasText(user.getAppkey())) {
-			throw new BusinessException(ErrorCode.KIS_API_KEY_NOT_FOUND, 
+			throw new BusinessException(ErrorCode.KIS_API_KEY_NOT_FOUND,
 					"KIS API 키가 설정되지 않았습니다. 사용자 설정에서 API 키를 등록해주세요.");
 		}
 
@@ -99,8 +83,8 @@ public class KisAuthService {
 		headers.setContentType(MediaType.APPLICATION_JSON);
 
 		// 인코딩된 appkey와 appsecret을 디코딩
-		String decodedAppkey = decodeBase64(user.getAppkey());
-		String decodedAppsecret = decodeBase64(user.getAppsecret());
+		String decodedAppkey = KisApiConfig.decodeBase64(user.getAppkey());
+		String decodedAppsecret = KisApiConfig.decodeBase64(user.getAppsecret());
 
 		Map<String, String> payload = Map.of(
 				"grant_type", "client_credentials",
@@ -113,32 +97,33 @@ public class KisAuthService {
 			log.info("KIS 토큰 발급 요청: URI={}, Virtual={}", uri, useVirtualServer);
 			ResponseEntity<KisAuthTokenDTO.KisTokenResponse> response =
 					restTemplate.exchange(uri, HttpMethod.POST, request, KisAuthTokenDTO.KisTokenResponse.class);
-			
+
 			KisAuthTokenDTO.KisTokenResponse body = response.getBody();
 			if (body == null) {
 				log.error("KIS 토큰 응답 본문이 비어있습니다.");
-				throw new BusinessException(ErrorCode.KIS_TOKEN_ISSUANCE_FAILED, 
+				throw new BusinessException(ErrorCode.KIS_TOKEN_ISSUANCE_FAILED,
 						"KIS 인증 토큰 발급에 실패했습니다. 응답이 비어있습니다.");
 			}
 
 			log.info("KIS 토큰 발급 성공: TokenType={}, ExpiresIn={}", body.getTokenType(), body.getExpiresIn());
             KisAuthToken kisAuthToken = KisAuthToken.builder()
+                    .user(user)
                     .accessToken(body.getAccessToken())
                     .tokenType(body.getTokenType())
                     .expiresIn(body.getExpiresIn())
                     .accessTokenTokenExpired(body.getAccessTokenExpired())
                     .build();
-
+            kisAuthRepository.save(kisAuthToken);
             return body;
 
 		} catch (RestClientResponseException e) {
 			log.error("KIS 토큰 발급 실패 (HTTP {}): {}", e.getStatusCode(), e.getResponseBodyAsString(), e);
-			throw new BusinessException(ErrorCode.KIS_TOKEN_ISSUANCE_FAILED, 
-					String.format("KIS 인증 토큰 발급에 실패했습니다. [HTTP %s] %s", 
+			throw new BusinessException(ErrorCode.KIS_TOKEN_ISSUANCE_FAILED,
+					String.format("KIS 인증 토큰 발급에 실패했습니다. [HTTP %s] %s",
 							e.getStatusCode(), e.getResponseBodyAsString()));
 		} catch (RestClientException e) {
 			log.error("KIS API 호출 중 오류 발생: {}", e.getMessage(), e);
-			throw new BusinessException(ErrorCode.KIS_API_ERROR, 
+			throw new BusinessException(ErrorCode.KIS_API_ERROR,
 					"KIS API 호출 중 오류가 발생했습니다: " + e.getMessage());
 		}
 	}

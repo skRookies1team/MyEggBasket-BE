@@ -6,6 +6,6 @@ import org.springframework.data.jpa.repository.JpaRepository;
 
 import java.util.Optional;
 
-public interface KisAuthService extends JpaRepository<KisAuthToken,Long> {
+public interface KisAuthRepository extends JpaRepository<KisAuthToken,Long> {
     Optional<KisAuthToken> findByUser(User user);
 }

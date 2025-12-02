@@ -42,18 +42,12 @@ public class KisApiConfig {
      * @return 디코딩된 문자열
      */
 
-
-    private String decodeBase64(String encoded) {
+    public static String decodeBase64(String encoded) {
         if (encoded == null || encoded.isEmpty()) {
             return encoded;
         }
-        try {
             byte[] decodedBytes = Base64.getDecoder().decode(encoded);
             return new String(decodedBytes, StandardCharsets.UTF_8);
-        } catch (IllegalArgumentException e) {
-            log.warn("Base64 디코딩 실패, 원본 값 사용: {}", e.getMessage());
-            return encoded; // 디코딩 실패 시 원본 반환
-        }
     }
 }
 
