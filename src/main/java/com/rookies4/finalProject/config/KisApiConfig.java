@@ -1,9 +1,14 @@
 package com.rookies4.finalProject.config;
 
+import com.rookies4.finalProject.service.KisAuthService;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.web.util.UriComponentsBuilder;
 
 import java.net.URI;
+import java.nio.charset.StandardCharsets;
+import java.util.Base64;
 
 /**
  * KIS API 관련 설정을 관리하는 Configuration 클래스
@@ -30,5 +35,25 @@ public class KisApiConfig {
 				.build(true)
 				.toUri();
 	}
+
+    /**
+     * Base64로 인코딩된 문자열을 디코딩합니다.
+     * @param encoded 인코딩된 문자열
+     * @return 디코딩된 문자열
+     */
+
+
+    private String decodeBase64(String encoded) {
+        if (encoded == null || encoded.isEmpty()) {
+            return encoded;
+        }
+        try {
+            byte[] decodedBytes = Base64.getDecoder().decode(encoded);
+            return new String(decodedBytes, StandardCharsets.UTF_8);
+        } catch (IllegalArgumentException e) {
+            log.warn("Base64 디코딩 실패, 원본 값 사용: {}", e.getMessage());
+            return encoded; // 디코딩 실패 시 원본 반환
+        }
+    }
 }
 
