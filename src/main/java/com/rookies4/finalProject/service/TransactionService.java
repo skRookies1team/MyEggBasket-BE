@@ -79,8 +79,10 @@ public class TransactionService {
     }
 
     /**
-     * 쿼리스트링 status 값을 enum 으로 변환 - pending / PENDING - completed / COMPLETE / COMPLETED - canceled / cancelled /
-     * CANCELED / CANCELLED
+     * 쿼리스트링 status 값을 enum 으로 변환
+     * - pending / PENDING
+     * - completed / COMPLETE / COMPLETED
+     * - canceled / cancelled / CANCELED / CANCELLED
      */
     private TransactionStatus parseStatus(String raw) {
         String v = raw.trim().toUpperCase();
