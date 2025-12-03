@@ -34,6 +34,9 @@ public class KisAuthToken {
     @Column(name = "expires_in")
     private Long expiresIn;
 
+    @Column(name = "approval_key", length = 500)
+    private String approvalKey;
+
     @Column(name = "access_token_token_expired", length = 50)
     private String accessTokenTokenExpired;
 }

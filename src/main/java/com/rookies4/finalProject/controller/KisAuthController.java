@@ -28,14 +28,12 @@ public class KisAuthController {
 	/**
 	 * KIS API 인증 토큰을 발급합니다.
 	 * 현재 로그인한 사용자의 API 키를 사용하여 토큰을 발급합니다.
-	 * 
-	 * @param useVirtualServer 모의투자 서버 사용 여부 (기본값: false)
+	 *
 	 * @return KIS 토큰 응답
 	 */
-	@PostMapping
-	public ResponseEntity<KisAuthTokenDTO.KisTokenResponse> issueToken(
-			@RequestParam(name = "virtual", defaultValue = "false") boolean useVirtualServer) {
-		
+	@PostMapping("/token")
+	public ResponseEntity<KisAuthTokenDTO.KisTokenResponse> issueToken() {
+        boolean useVirtualServer = false;
 		// 현재 로그인한 사용자 확인
 		Long currentUserId = SecurityUtil.getCurrentUserId();
 		if (currentUserId == null) {
@@ -49,6 +47,26 @@ public class KisAuthController {
 
 		return ResponseEntity.ok(kisAuthService.issueToken(useVirtualServer, user));
 	}
+
+    @PostMapping("/approval-key")
+    public ResponseEntity<KisAuthTokenDTO.KisApprovalKeyResponse> issueApprovalKey() {
+        boolean useVirtualServer = false;
+
+        // 현재 로그인한 사용자 확인
+        Long currentUserId = SecurityUtil.getCurrentUserId();
+        if (currentUserId == null) {
+            throw new BusinessException(ErrorCode.AUTH_ACCESS_DENIED, "로그인이 필요합니다.");
+        }
+
+        // 사용자 조회
+        User user = userRepository.findById(currentUserId)
+                .orElseThrow(() -> new BusinessException(ErrorCode.USER_NOT_FOUND,
+                        "로그인한 사용자를 찾을 수 없습니다."));
+
+        return ResponseEntity.ok(kisAuthService.issueApprovalKey(useVirtualServer, user));
+    }
+
+
 }
 
 

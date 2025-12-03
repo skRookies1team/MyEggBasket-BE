@@ -37,4 +37,12 @@ public class KisAuthTokenDTO {
         @JsonProperty("access_token_token_expired")
         private String accessTokenExpired;
     }
+    @Data
+    @NoArgsConstructor
+    @AllArgsConstructor
+    @Builder
+    public static class KisApprovalKeyResponse{
+        @JsonProperty("approval_key")
+        private String approvalKey;
+    }
 }
