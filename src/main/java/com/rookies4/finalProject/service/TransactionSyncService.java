@@ -17,6 +17,7 @@ import java.util.Optional;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
 @Slf4j
@@ -34,7 +35,7 @@ public class TransactionSyncService {
      * - 2) 일간 주문 내역 조회
      * - 3) DB(Transaction) 갱신
      */
-    @Transactional
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
     public void syncUserOrdersFromKis(User user) {
         // TODO: 실제 환경에 맞게 모의/실거래 여부를 User 설정값 등에서 가져오도록 변경
         boolean useVirtual = true;

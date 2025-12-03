@@ -24,7 +24,7 @@ public class TransactionService {
 
     private final TransactionRepository transactionRepository;
     private final UserRepository userRepository;
-    private final TransactionSyncService transactionSyncService; // 주문 조회용
+    private final TransactionSyncService transactionSyncService;
 
     /**
      * 사용자 주문/거래 내역 조회
@@ -64,7 +64,7 @@ public class TransactionService {
         }
 
         List<Transaction> transactions;
-        if (statusParam != null) {
+        if (statusFilter != null) {
             transactions = transactionRepository
                     .findByUser_IdAndStatusOrderByExecutedAtDesc(userId, statusFilter);
         } else {
