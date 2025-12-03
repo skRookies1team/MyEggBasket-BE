@@ -23,14 +23,6 @@ public class KisApiConfig {
     // 모의투자 서버 Base URL
 	private static final String VIRTUAL_BASE_URL = "https://openapivts.koreainvestment.com:29443";
 
-	@Bean
-	public RestTemplate restTemplate(RestTemplateBuilder builder) {
-		return builder
-				.setConnectTimeout(Duration.ofSeconds(5)) // 연결 시간 초과 5초
-				.setReadTimeout(Duration.ofSeconds(10)) // 읽기 시간 초과 10초
-				.build();
-	}
-
 	/**
 	 * API 엔드포인트 URI를 생성합니다.
 	 * @param useVirtualServer 모의투자 서버 사용 여부
