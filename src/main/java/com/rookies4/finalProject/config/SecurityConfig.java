@@ -32,6 +32,7 @@ public class SecurityConfig {
     private final JwtAuthenticationFilter jwtAuthenticationFilter;
     private final CustomUserDetailsService userDetailsService;
 
+
     @Bean
     public PasswordEncoder passwordEncoder() {
         return new BCryptPasswordEncoder();
@@ -57,8 +58,15 @@ public class SecurityConfig {
                 .cors(cors -> cors.configurationSource(corsConfigurationSource()))
                 .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .authorizeHttpRequests(auth -> auth
-                        // 공개 엔드포인트
-                        .requestMatchers("/api/v1/auth/**", "/api/app/auth/signup", "/api/app/auth/login", "/api/users", "/api/auth/**").permitAll()
+                        // 공개 엔드포인트 설정
+                        .requestMatchers(
+                                "/api/v1/auth/**",
+                                "/api/app/auth/signup",
+                                "/api/app/auth/login",
+                                "/api/users",
+                                "/api/auth/**",
+                                "/api/app/stocks/**" // [추가됨] 주식 관련 API 허용
+                        ).permitAll()
                         .requestMatchers("/swagger-ui/**", "/v3/api-docs/**", "/swagger-resources/**").permitAll()
                         .requestMatchers("/actuator/**").permitAll()
                         // 나머지 엔드포인트는 인증 필요
