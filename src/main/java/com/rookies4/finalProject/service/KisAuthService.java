@@ -2,11 +2,9 @@ package com.rookies4.finalProject.service;
 
 import com.rookies4.finalProject.dto.KisAuthTokenDTO.KisTokenResponse;
 import java.net.URI;
-import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
-import java.util.Base64;
 import java.util.Map;
 
 import com.rookies4.finalProject.config.KisApiConfig;
