@@ -1,8 +1,11 @@
 package com.rookies4.finalProject.service;
 
+import com.rookies4.finalProject.dto.KisAuthTokenDTO.KisTokenResponse;
 import java.net.URI;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
+import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
 import java.util.Base64;
 import java.util.Map;
 
@@ -54,13 +57,14 @@ public class KisAuthService {
 
     /**
      * KIS 토큰 정보를 DB에 저장하거나 갱신합니다. (생성 및 업데이트 로직)
-     * @param user 사용자 엔티티
+     *
+     * @param user     사용자 엔티티
      * @param newToken 새로 발급받은 토큰 DTO
      * @return 갱신되거나 새로 생성된 KisAuthToken 엔티티
      */
     @Transactional
-    public KisAuthToken renewToken(User user, KisAuthTokenDTO.KisTokenResponse newToken) { //
-        KisAuthToken existingToken = kisAuthRepository.findByUser(user) //
+    public KisAuthToken renewToken(User user, KisAuthTokenDTO.KisTokenResponse newToken) {
+        KisAuthToken existingToken = kisAuthRepository.findByUser(user)
                 .orElse(KisAuthToken.builder()
                         .user(user)
                         .tokenType(null)
@@ -77,109 +81,18 @@ public class KisAuthService {
 
         return kisAuthRepository.save(existingToken); // 기존 레코드 업데이트 또는 새 레코드 저장
     }
-    @Transactional
-    public KisAuthToken renewApprovalKey(User user, KisAuthTokenDTO.KisApprovalKeyResponse newApprovalKey) { //
-        KisAuthToken existingToken = kisAuthRepository.findByUser(user) //
-                .orElse(KisAuthToken.builder()
-                        .user(user)
-                        .tokenType(null)
-                        .accessToken(null)
-                        .accessTokenTokenExpired(null)
-                        .approvalKey(null)
-                        .expiresIn(null)
-                        .build()); // 없으면 새로 생성
-
-        // 💡 [수정] 모든 토큰 필드를 업데이트합니다.
-        existingToken.setApprovalKey(newApprovalKey.getApprovalKey());
-
-
-        return kisAuthRepository.save(existingToken); // 기존 레코드 업데이트 또는 새 레코드 저장
-    }
-
 
     /**
      * KIS API 인증 토큰을 발급합니다.
+     * DB에 저장된 토큰이 있으면 재사용하고, 없거나 만료되었다면 새로 발급해서 저장한 뒤 반환합니다.
      * @param useVirtualServer 모의투자 서버 사용 여부
-     * @param user 사용자 엔티티
+     * @param user             사용자 엔티티
      * @return KIS 토큰 응답
      */
     public KisAuthTokenDTO.KisTokenResponse issueToken(boolean useVirtualServer, User user) { //
 
-        String path = "/oauth2/tokenP";
-
         // 사용자 검증
-        if (user == null) { //
-            throw new BusinessException(ErrorCode.USER_NOT_FOUND, "사용자 정보를 찾을 수 없습니다."); //
-        }
-
-        // API 키 검증
-        if (!StringUtils.hasText(user.getAppkey())) { //
-            throw new BusinessException(ErrorCode.KIS_API_KEY_NOT_FOUND,
-                    "KIS API 키가 설정되지 않았습니다. 사용자 설정에서 API 키를 등록해주세요."); //
-        }
-
-        if (!StringUtils.hasText(user.getAppsecret())) { //
-            throw new BusinessException(ErrorCode.KIS_API_SECRET_NOT_FOUND,
-                    "KIS API Secret이 설정되지 않았습니다. 사용자 설정에서 API Secret을 등록해주세요."); //
-        }
-        URI uri = KisApiConfig.uri(useVirtualServer, path); //
-
-        HttpHeaders headers = new HttpHeaders(); //
-        headers.setContentType(MediaType.APPLICATION_JSON); //
-
-        // 인코딩된 appkey와 appsecret을 디코딩
-        String decodedAppkey = KisApiConfig.decodeBase64(user.getAppkey()); //
-        String decodedAppsecret = KisApiConfig.decodeBase64(user.getAppsecret()); //
-
-        Map<String, String> payload = Map.of( //
-                "grant_type", "client_credentials",
-                "appkey", decodedAppkey,
-                "appsecret", decodedAppsecret);
-
-        HttpEntity<Map<String, String>> request = new HttpEntity<>(payload, headers); //
-
-        try {
-            log.info("KIS 토큰 발급 요청: URI={}, Virtual={}", uri, useVirtualServer); //
-            ResponseEntity<KisAuthTokenDTO.KisTokenResponse> response =
-                    restTemplate.exchange(uri, HttpMethod.POST, request, KisAuthTokenDTO.KisTokenResponse.class); //
-
-            KisAuthTokenDTO.KisTokenResponse body = response.getBody(); //
-            if (body == null) { //
-                log.error("KIS 토큰 응답 본문이 비어있습니다."); //
-                throw new BusinessException(ErrorCode.KIS_TOKEN_ISSUANCE_FAILED,
-                        "KIS 인증 토큰 발급에 실패했습니다. 응답이 비어있습니다."); //
-            }
-
-            log.info("KIS 토큰 발급 성공: TokenType={}, ExpiresIn={}", body.getTokenType(), body.getExpiresIn());
-
-            // 💡 [수정] 토큰 엔티티 생성 및 DB 저장 로직을 renewToken 메서드로 위임
-            renewToken(user, body);
-
-            return body; //
-
-        } catch (RestClientResponseException e) {
-            log.error("KIS 토큰 발급 실패 (HTTP {}): {}", e.getStatusCode(), e.getResponseBodyAsString(), e); //
-            throw new BusinessException(ErrorCode.KIS_TOKEN_ISSUANCE_FAILED,
-                    String.format("KIS 인증 토큰 발급에 실패했습니다. [HTTP %s] %s",
-                            e.getStatusCode(), e.getResponseBodyAsString())); //
-        } catch (RestClientException e) {
-            log.error("KIS API 호출 중 오류 발생: {}", e.getMessage(), e); //
-            throw new BusinessException(ErrorCode.KIS_API_ERROR,
-                    "KIS API 호출 중 오류가 발생했습니다: " + e.getMessage()); //
-        }
-    }
-
-    /**
-     * KIS API Websocket approvalKey를 발급합니다.
-     * @param user 사용자 엔티티
-     * @return KIS approvalKey 응답
-     */
-    public KisAuthTokenDTO.KisApprovalKeyResponse issueApprovalKey(boolean useVirtualServer, User user){
-
-        String path = "/oauth2/Approval";
-
-        // 사용자 검증
-        if (user == null) { //
+        if (user == null) {
             throw new BusinessException(ErrorCode.USER_NOT_FOUND, "사용자 정보를 찾을 수 없습니다.");
         }
 
@@ -193,10 +106,43 @@ public class KisAuthService {
             throw new BusinessException(ErrorCode.KIS_API_SECRET_NOT_FOUND,
                     "KIS API Secret이 설정되지 않았습니다. 사용자 설정에서 API Secret을 등록해주세요.");
         }
+
+        // 기존 토큰 조회 & 유효하면 재사용
+        KisAuthToken existing = kisAuthRepository.findByUser(user).orElse(null);
+        if (existing != null && isTokenValid(existing)) {
+            log.info("기존 KIS 토큰 재사용: userId={}, expiresAt={}",
+                    user.getId(), existing.getAccessTokenTokenExpired());
+
+            KisAuthTokenDTO.KisTokenResponse dto = new KisTokenResponse();
+            dto.setAccessToken(existing.getAccessToken());
+            dto.setTokenType(existing.getTokenType());
+            dto.setExpiresIn(existing.getExpiresIn());
+            dto.setAccessTokenExpired(existing.getAccessTokenTokenExpired());
+
+            return dto;
+        }
+
+        // 유효한 토큰이 없으면 새로 발급
+        KisAuthTokenDTO.KisTokenResponse body =
+                requestNewTokenFromKis(useVirtualServer, user);
+
+        // DB에 저장/갱신
+        renewToken(user, body);
+
+        return body;
+    }
+
+    /**
+     * 실제 KIS 서버에 토큰 발급을 요청하는 메서드 항상 새 토큰을 발급받음
+     */
+    private KisAuthTokenDTO.KisTokenResponse requestNewTokenFromKis(boolean useVirtualServer, User user) {
+
+        String path = "/oauth2/tokenP";
         URI uri = KisApiConfig.uri(useVirtualServer, path);
 
         HttpHeaders headers = new HttpHeaders();
         headers.setContentType(MediaType.APPLICATION_JSON);
+
         // 인코딩된 appkey와 appsecret을 디코딩
         String decodedAppkey = KisApiConfig.decodeBase64(user.getAppkey());
         String decodedAppsecret = KisApiConfig.decodeBase64(user.getAppsecret());
@@ -204,31 +150,76 @@ public class KisAuthService {
         Map<String, String> payload = Map.of(
                 "grant_type", "client_credentials",
                 "appkey", decodedAppkey,
-                "secretkey", decodedAppsecret);
+                "appsecret", decodedAppsecret
+        );
 
         HttpEntity<Map<String, String>> request = new HttpEntity<>(payload, headers);
 
         try {
-            ResponseEntity<KisAuthTokenDTO.KisApprovalKeyResponse> response =
-                    restTemplate.exchange(uri, HttpMethod.POST, request, KisAuthTokenDTO.KisApprovalKeyResponse.class); //
+            log.info("KIS 토큰 발급 요청: URI={}, Virtual={}", uri, useVirtualServer);
+            ResponseEntity<KisAuthTokenDTO.KisTokenResponse> response =
+                    restTemplate.exchange(
+                            uri,
+                            HttpMethod.POST,
+                            request,
+                            KisAuthTokenDTO.KisTokenResponse.class
+                    );
 
-            KisAuthTokenDTO.KisApprovalKeyResponse body = response.getBody(); //
-            if (body == null) { //
-                throw new BusinessException(ErrorCode.KIS_TOKEN_ISSUANCE_FAILED,
-                        "KIS 인증 토큰 발급에 실패했습니다. 응답이 비어있습니다."); //
+            KisAuthTokenDTO.KisTokenResponse body = response.getBody();
+            if (body == null) {
+                log.error("KIS 토큰 응답 본문이 비어있습니다.");
+                throw new BusinessException(
+                        ErrorCode.KIS_TOKEN_ISSUANCE_FAILED,
+                        "KIS 인증 토큰 발급에 실패했습니다. 응답이 비어있습니다."
+                );
             }
 
-            renewApprovalKey(user, body);
+            log.info("KIS 토큰 발급 성공: TokenType={}, ExpiresIn={}",
+                    body.getTokenType(), body.getExpiresIn());
 
-            return body; //
+            return body;
 
         } catch (RestClientResponseException e) {
-            throw new BusinessException(ErrorCode.KIS_TOKEN_ISSUANCE_FAILED,
+            log.error("KIS 토큰 발급 실패 (HTTP {}): {}",
+                    e.getStatusCode(), e.getResponseBodyAsString(), e);
+            throw new BusinessException(
+                    ErrorCode.KIS_TOKEN_ISSUANCE_FAILED,
                     String.format("KIS 인증 토큰 발급에 실패했습니다. [HTTP %s] %s",
-                            e.getStatusCode(), e.getResponseBodyAsString())); //
+                            e.getStatusCode(), e.getResponseBodyAsString())
+            );
         } catch (RestClientException e) {
-            throw new BusinessException(ErrorCode.KIS_API_ERROR,
-                    "KIS API 호출 중 오류가 발생했습니다: " + e.getMessage()); //
+            log.error("KIS API 호출 중 오류 발생: {}", e.getMessage(), e);
+            throw new BusinessException(
+                    ErrorCode.KIS_API_ERROR,
+                    "KIS API 호출 중 오류가 발생했습니다: " + e.getMessage()
+            );
+        }
+    }
+
+    /**
+     * DB에 저장된 토큰이 유효한지 검사 만료 시간이 1분 이상 남아있으면 유효하다고 본다.
+     */
+    private boolean isTokenValid(KisAuthToken token) {
+        if (!StringUtils.hasText(token.getAccessToken())
+                || token.getAccessTokenTokenExpired() == null) {
+            return false;
+        }
+
+        try {
+            DateTimeFormatter formatter =
+                    DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
+            LocalDateTime expiredAt =
+                    LocalDateTime.parse(token.getAccessTokenTokenExpired(), formatter);
+
+            LocalDateTime now = LocalDateTime.now();
+
+            // 만료 60초 전까지만 유효로 본다
+            return now.isBefore(expiredAt.minusSeconds(60));
+
+        } catch (Exception e) {
+            log.warn("KIS 토큰 만료 시간 파싱 실패, 재발급 시도. value={}",
+                    token.getAccessTokenTokenExpired());
+            return false;
         }
     }
 }
