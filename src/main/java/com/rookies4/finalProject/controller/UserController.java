@@ -1,10 +1,9 @@
 package com.rookies4.finalProject.controller;
 
-import com.rookies4.finalProject.domain.enums.TransactionStatus;
 import com.rookies4.finalProject.dto.TransactionDTO;
-import com.rookies4.finalProject.dto.TransactionDTO.Response;
 import com.rookies4.finalProject.dto.UserDTO;
 import com.rookies4.finalProject.security.SecurityUtil;
+import com.rookies4.finalProject.service.TransactionService;
 import com.rookies4.finalProject.service.UserService;
 import jakarta.validation.Valid;
 import java.util.List;
@@ -19,6 +18,7 @@ import org.springframework.web.bind.annotation.*;
 public class UserController {
 
     private final UserService userService;
+    private final TransactionService transactionService;
 
     // 1. 현재 로그인한 사용자 정보 조회
     @GetMapping("/me")
@@ -59,8 +59,9 @@ public class UserController {
     @GetMapping("/{userId}/orders")
     public ResponseEntity<List<TransactionDTO.Response>> getUserOrders (
             @PathVariable Long userId,
-            @RequestParam(required = false) String status) { // status 는 필수 아님(nullable)
-
-        return ResponseEntity.ok(userService.getUserOrders(userId, status));
+            @RequestParam(required = false) String status) { // status 는 필수 아님 (nullable)
+        List<TransactionDTO.Response> result =
+                transactionService.getUserOrders(userId, status);
+        return ResponseEntity.ok(result);
     }
 }
