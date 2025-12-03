@@ -18,7 +18,7 @@ import org.springframework.web.bind.annotation.RestController;
  * Exposes an endpoint that issues KIS Open API access tokens on demand.
  */
 @RestController
-@RequestMapping("/api/app/kis")
+@RequestMapping("/api/app/kis/auth")
 @RequiredArgsConstructor
 public class KisAuthController {
 
@@ -32,7 +32,7 @@ public class KisAuthController {
 	 * @param useVirtualServer 모의투자 서버 사용 여부 (기본값: false)
 	 * @return KIS 토큰 응답
 	 */
-	@PostMapping("/token")
+	@PostMapping
 	public ResponseEntity<KisAuthTokenDTO.KisTokenResponse> issueToken(
 			@RequestParam(name = "virtual", defaultValue = "false") boolean useVirtualServer) {
 		
