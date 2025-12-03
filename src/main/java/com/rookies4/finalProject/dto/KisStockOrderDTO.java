@@ -54,8 +54,8 @@ public class KisStockOrderDTO {
     @Builder
     public static class KisStockOrderRequest {
         private String orderId;       // "매수" 또는 "매도"
-        private String stockCode;     // 종목코드 (stackCode -> stockCode 수정)
+        private String stockCode;     // 종목코드
         private String orderQuantity; // 주문수량
-        private String orderPrice;    // 주문단가 (지정가)
+//        private String orderPrice;    // 주문단가 (지정가)
     }
 }

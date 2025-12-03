@@ -17,9 +17,13 @@ import org.springframework.web.client.RestClientException;
 import org.springframework.web.client.RestClientResponseException;
 import org.springframework.web.client.RestTemplate;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.ObjectMapper; // 💡 ObjectMapper import 추가
+
 import java.net.URI;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.stream.Collectors; // Collectors import 유지 (로깅용)
 
 @Service
 @Transactional
@@ -30,6 +34,7 @@ public class KisStockOrderService {
 
     private final RestTemplate restTemplate;
     private final KisAuthRepository kisAuthRepository;
+    private final ObjectMapper objectMapper; // 💡 ObjectMapper 주입
 
     /**
      * tradeId를 선택합니다
@@ -40,7 +45,7 @@ public class KisStockOrderService {
     private String chooseTradeId(boolean useVirtualServer, String orderId){
         if(useVirtualServer){
             if("매수".equals(orderId)){
-                return "VTTC0802U"; // 모의투자 매수 (API 문서 기준 확인 필요, 보통 VTTC0802U)
+                return "VTTC0802U"; // 모의투자 매수
             } else {
                 return "VTTC0801U"; // 모의투자 매도
             }
@@ -75,26 +80,68 @@ public class KisStockOrderService {
 
         HttpHeaders headers = new HttpHeaders();
         headers.setContentType(MediaType.APPLICATION_JSON);
-        headers.set("authorization", kisAuthToken.getTokenType() + kisAuthToken.getAccessToken());
+        headers.set("content-type","application/json; charset=utf-8");
+        // 토큰은 보안상 전체를 로깅하지 않습니다.
+        headers.set("authorization", kisAuthToken.getTokenType() +" "+ kisAuthToken.getAccessToken());
         headers.set("appkey", decodedAppkey);
+        // appsecret은 보안상 로깅하지 않습니다.
         headers.set("appsecret", decodedAppsecret);
         headers.set("tr_id", tradeId);
         headers.set("custtype", "P"); // 개인: P, 법인: B (일반적으로 P 사용)
 
-        Map<String, String> body = new HashMap<>();
-        body.put("CANO", account);             // 종합계좌번호 (8자리)
-        body.put("ACNT_PRDT_CD", "01");        // 계좌상품코드 (보통 01)
-        body.put("PDNO", orderRequest.getStockCode()); // 종목코드
-        body.put("ORD_DVSN", "00");            // [추가] 주문구분 (00: 지정가, 01: 시장가 등)
-        body.put("ORD_QTY", orderRequest.getOrderQuantity()); // 주문수량
-        body.put("ORD_UNPR", orderRequest.getOrderPrice());   // 주문단가
+        // ====================================================================
+        // 💡 [수정] 요청 Body Map을 생성하고 JSON String으로 변환
+        // ====================================================================
+        Map<String, String> bodyMap = new HashMap<>();
+        bodyMap.put("CANO", account);
+        bodyMap.put("ACNT_PRDT_CD", "01");
+        bodyMap.put("PDNO", orderRequest.getStockCode());
+        bodyMap.put("ORD_DVSN", "01");
+        bodyMap.put("ORD_QTY", orderRequest.getOrderQuantity());
+        bodyMap.put("ORD_UNPR", "0");
 
-        HttpEntity<Map<String, String>> request = new HttpEntity<>(body, headers);
+        String requestBodyJson;
+        try {
+            // Map을 명시적으로 JSON 문자열로 변환 (직렬화)
+            requestBodyJson = objectMapper.writeValueAsString(bodyMap);
+        } catch (JsonProcessingException e) {
+            log.error("JSON 직렬화 오류 발생: {}", e.getMessage(), e);
+            throw new BusinessException(ErrorCode.INTERNAL_SERVER_ERROR, "주문 데이터 변환에 실패했습니다.");
+        }
+
+        // HttpEntity를 String Body와 Headers로 생성
+        HttpEntity<String> request = new HttpEntity<>(requestBodyJson, headers);
+        // ====================================================================
+
+
+        // 💡 [수정] 로깅 부분: String 변수를 직접 로깅
+        log.info("### KIS 주문 요청 전체 정보 로깅 시작 (서버: {}) ###", useVirtualServer ? "모의투자" : "실전투자");
+        log.info("KIS URL: {}", uri);
+        log.info("거래 구분 (tr_id): {}", tradeId);
+
+        // 1. Headers 로깅 (보안상 마스킹 처리 유지)
+        log.info("--- Headers ---");
+        log.info("Authorization: {} ...", kisAuthToken.getTokenType());
+        log.info("appkey: {}", decodedAppkey);
+        log.info("appsecret: {} ...", decodedAppsecret.substring(0, Math.min(5, decodedAppsecret.length())));
+        log.info("tr_id: {}", tradeId);
+        log.info("Content-Type: {}", headers.getContentType());
+        log.info("custtype: {}", headers.get("custtype"));
+
+        // 2. Body 로깅
+        log.info("--- Body ---");
+        log.info("Request Body (JSON): {}", requestBodyJson); // 명시적으로 변환된 JSON String 로깅
+
+        log.info("### KIS 주문 요청 전체 정보 로깅 종료 ###");
+        // 💡 로깅 부분 끝
 
         try {
+            // HttpEntity<String>으로 요청을 보내고, 응답은 KisStockOrderResponse 클래스로 받음
             ResponseEntity<KisStockOrderDTO.KisStockOrderResponse> response =
                     restTemplate.exchange(uri, HttpMethod.POST, request, KisStockOrderDTO.KisStockOrderResponse.class);
 
+            // 성공 시 응답도 로깅
+            log.info("KIS 주문 성공 응답: {}", response.getBody());
             return response.getBody();
 
         } catch (RestClientResponseException e) {
