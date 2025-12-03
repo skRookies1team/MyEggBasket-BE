@@ -65,8 +65,4 @@ public class KisAuthController {
 
         return ResponseEntity.ok(kisAuthService.issueApprovalKey(useVirtualServer, user));
     }
-
-
 }
-
-

@@ -57,7 +57,6 @@ public class KisAuthService {
 
     /**
      * KIS 토큰 정보를 DB에 저장하거나 갱신합니다. (생성 및 업데이트 로직)
-     *
      * @param user     사용자 엔티티
      * @param newToken 새로 발급받은 토큰 DTO
      * @return 갱신되거나 새로 생성된 KisAuthToken 엔티티
@@ -78,6 +77,25 @@ public class KisAuthService {
         existingToken.setTokenType(newToken.getTokenType());
         existingToken.setExpiresIn(newToken.getExpiresIn());
         existingToken.setAccessTokenTokenExpired(newToken.getAccessTokenExpired());
+
+        return kisAuthRepository.save(existingToken); // 기존 레코드 업데이트 또는 새 레코드 저장
+    }
+
+    @Transactional
+    public KisAuthToken renewApprovalKey(User user, KisAuthTokenDTO.KisApprovalKeyResponse newApprovalKey) { //
+        KisAuthToken existingToken = kisAuthRepository.findByUser(user) //
+                .orElse(KisAuthToken.builder()
+                        .user(user)
+                        .tokenType(null)
+                        .accessToken(null)
+                        .accessTokenTokenExpired(null)
+                        .approvalKey(null)
+                        .expiresIn(null)
+                        .build()); // 없으면 새로 생성
+
+        // 💡 [수정] 모든 토큰 필드를 업데이트합니다.
+        existingToken.setApprovalKey(newApprovalKey.getApprovalKey());
+
 
         return kisAuthRepository.save(existingToken); // 기존 레코드 업데이트 또는 새 레코드 저장
     }
@@ -193,6 +211,69 @@ public class KisAuthService {
                     ErrorCode.KIS_API_ERROR,
                     "KIS API 호출 중 오류가 발생했습니다: " + e.getMessage()
             );
+        }
+    }
+
+    /**
+     * KIS API Websocket approvalKey를 발급합니다.
+     * @param user 사용자 엔티티
+     * @return KIS approvalKey 응답
+     */
+    public KisAuthTokenDTO.KisApprovalKeyResponse issueApprovalKey(boolean useVirtualServer, User user){
+
+        String path = "/oauth2/Approval";
+
+        // 사용자 검증
+        if (user == null) { //
+            throw new BusinessException(ErrorCode.USER_NOT_FOUND, "사용자 정보를 찾을 수 없습니다.");
+        }
+
+        // API 키 검증
+        if (!StringUtils.hasText(user.getAppkey())) {
+            throw new BusinessException(ErrorCode.KIS_API_KEY_NOT_FOUND,
+                    "KIS API 키가 설정되지 않았습니다. 사용자 설정에서 API 키를 등록해주세요.");
+        }
+
+        if (!StringUtils.hasText(user.getAppsecret())) {
+            throw new BusinessException(ErrorCode.KIS_API_SECRET_NOT_FOUND,
+                    "KIS API Secret이 설정되지 않았습니다. 사용자 설정에서 API Secret을 등록해주세요.");
+        }
+        URI uri = KisApiConfig.uri(useVirtualServer, path);
+
+        HttpHeaders headers = new HttpHeaders();
+        headers.setContentType(MediaType.APPLICATION_JSON);
+        // 인코딩된 appkey와 appsecret을 디코딩
+        String decodedAppkey = KisApiConfig.decodeBase64(user.getAppkey());
+        String decodedAppsecret = KisApiConfig.decodeBase64(user.getAppsecret());
+
+        Map<String, String> payload = Map.of(
+                "grant_type", "client_credentials",
+                "appkey", decodedAppkey,
+                "secretkey", decodedAppsecret);
+
+        HttpEntity<Map<String, String>> request = new HttpEntity<>(payload, headers);
+
+        try {
+            ResponseEntity<KisAuthTokenDTO.KisApprovalKeyResponse> response =
+                    restTemplate.exchange(uri, HttpMethod.POST, request, KisAuthTokenDTO.KisApprovalKeyResponse.class); //
+
+            KisAuthTokenDTO.KisApprovalKeyResponse body = response.getBody(); //
+            if (body == null) { //
+                throw new BusinessException(ErrorCode.KIS_TOKEN_ISSUANCE_FAILED,
+                        "KIS 인증 토큰 발급에 실패했습니다. 응답이 비어있습니다."); //
+            }
+
+            renewApprovalKey(user, body);
+
+            return body; //
+
+        } catch (RestClientResponseException e) {
+            throw new BusinessException(ErrorCode.KIS_TOKEN_ISSUANCE_FAILED,
+                    String.format("KIS 인증 토큰 발급에 실패했습니다. [HTTP %s] %s",
+                            e.getStatusCode(), e.getResponseBodyAsString())); //
+        } catch (RestClientException e) {
+            throw new BusinessException(ErrorCode.KIS_API_ERROR,
+                    "KIS API 호출 중 오류가 발생했습니다: " + e.getMessage()); //
         }
     }
 
