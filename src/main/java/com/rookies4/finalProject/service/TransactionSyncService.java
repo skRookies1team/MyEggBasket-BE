@@ -4,7 +4,7 @@ import com.rookies4.finalProject.domain.entity.Transaction;
 import com.rookies4.finalProject.domain.entity.User;
 import com.rookies4.finalProject.domain.enums.TransactionStatus;
 import com.rookies4.finalProject.domain.enums.TransactionType;
-import com.rookies4.finalProject.dto.KisAuthDTO;
+import com.rookies4.finalProject.dto.KisAuthTokenDTO;
 import com.rookies4.finalProject.dto.KisTransactionDto;
 import com.rookies4.finalProject.repository.TransactionRepository;
 import java.math.BigDecimal;
@@ -39,7 +39,7 @@ public class TransactionSyncService {
         // TODO: 실제 환경에 맞게 모의/실거래 여부를 User 설정값 등에서 가져오도록 변경
         boolean useVirtual = true;
 
-        KisAuthDTO.KisTokenResponse tokenResponse =
+        KisAuthTokenDTO.KisTokenResponse tokenResponse =
                 kisAuthService.issueToken(useVirtual, user);
 
         String accessToken = tokenResponse.getAccessToken();
