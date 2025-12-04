@@ -34,7 +34,7 @@ public class KisStockOrderService {
 
     private final RestTemplate restTemplate;
     private final KisAuthRepository kisAuthRepository;
-    private final ObjectMapper objectMapper; // 💡 ObjectMapper 주입
+    private final ObjectMapper objectMapper;
 
     /**
      * tradeId를 선택합니다

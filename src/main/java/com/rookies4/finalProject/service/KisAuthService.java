@@ -70,13 +70,12 @@ public class KisAuthService {
                         .expiresIn(null)
                         .build()); // 없으면 새로 생성
 
-        // 💡 [수정] 모든 토큰 필드를 업데이트합니다.
         existingToken.setAccessToken(newToken.getAccessToken());
         existingToken.setTokenType(newToken.getTokenType());
         existingToken.setExpiresIn(newToken.getExpiresIn());
         existingToken.setAccessTokenTokenExpired(newToken.getAccessTokenExpired());
 
-        return kisAuthRepository.save(existingToken); // 기존 레코드 업데이트 또는 새 레코드 저장
+        return kisAuthRepository.save(existingToken);
     }
 
     @Transactional
@@ -95,7 +94,7 @@ public class KisAuthService {
         existingToken.setApprovalKey(newApprovalKey.getApprovalKey());
 
 
-        return kisAuthRepository.save(existingToken); // 기존 레코드 업데이트 또는 새 레코드 저장
+        return kisAuthRepository.save(existingToken);
     }
 
     /**
