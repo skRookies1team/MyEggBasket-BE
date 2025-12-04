@@ -21,7 +21,7 @@ public class InterestStock {
     @Column(name = "interest_id")
     private Long interestId;
 
-    @ManyToOne(fetch = FetchType.LAZY)
+    @ManyToOne(fetch = FetchType.LAZY, cascade = CascadeType.REMOVE)
     @JoinColumn(name = "user_id", nullable = false)
     private User user;
 

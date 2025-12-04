@@ -22,7 +22,7 @@ public class Portfolio {
     @Column(name = "portfolio_id")
     private Long portfolioId;
 
-    @ManyToOne(fetch = FetchType.LAZY)
+    @ManyToOne(fetch = FetchType.LAZY, cascade = CascadeType.REMOVE)
     @JoinColumn(name = "user_id")
     private User user;
 
