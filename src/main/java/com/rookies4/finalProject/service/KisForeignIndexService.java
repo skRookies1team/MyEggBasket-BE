@@ -36,7 +36,7 @@ public class KisForeignIndexService {
 
 
     public KisForeignIndexDTO.KisForeignIndexResponse showForeignIndex(
-            User user, KisForeignIndexDTO.RequestQueryParam indexCode) {
+            User user, KisForeignIndexDTO.KisForeignIndexRequest indexCode) {
         String path = "/uapi/overseas-price/v1/quotations/inquire-time-indexchartprice";
 
         URI uri = KisApiConfig.uri(false, path);

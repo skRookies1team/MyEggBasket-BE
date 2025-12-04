@@ -1,12 +1,27 @@
 package com.rookies4.finalProject.service;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.rookies4.finalProject.config.KisApiConfig;
+import com.rookies4.finalProject.domain.entity.KisAuthToken;
+import com.rookies4.finalProject.domain.entity.User;
+import com.rookies4.finalProject.dto.KisForeignIndexDTO;
+import com.rookies4.finalProject.dto.KisKoreaIndexDTO;
+import com.rookies4.finalProject.exception.BusinessException;
+import com.rookies4.finalProject.exception.ErrorCode;
 import com.rookies4.finalProject.repository.KisAuthRepository;
 import lombok.RequiredArgsConstructor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.http.*;
 import org.springframework.stereotype.Service;
+import org.springframework.web.client.RestClientException;
+import org.springframework.web.client.RestClientResponseException;
 import org.springframework.web.client.RestTemplate;
+
+import java.net.URI;
+import java.util.HashMap;
+import java.util.Map;
 
 @Service
 @RequiredArgsConstructor
@@ -18,5 +33,67 @@ public class KisKoreaIndexService {
     private final KisAuthRepository kisAuthRepository;
     private final ObjectMapper objectMapper;
 
-    public
+    public KisKoreaIndexDTO.KisKoreaIndexResponse showKoreaIndex(
+            User user, KisKoreaIndexDTO.KisKoreaIndexRequest indexCode){
+
+        String path = "/uapi/domestic-stock/v1/quotations/inquire-index-tickprice";
+
+        URI uri = KisApiConfig.uri(false, path);
+
+        // 인증 토큰 조회
+        KisAuthToken kisAuthToken = kisAuthRepository.findByUser(user)
+                .orElseThrow(() -> new BusinessException(ErrorCode.BUSINESS_RULE_VIOLATION, "token이 존재하지 않습니다."));
+
+        String decodedAppkey = KisApiConfig.decodeBase64(user.getAppkey());
+        String decodedAppsecret = KisApiConfig.decodeBase64(user.getAppsecret());
+        String tradeId = "FHPUP02110100";
+
+        //RequestHeader
+        HttpHeaders headers = new HttpHeaders();
+        headers.setContentType(MediaType.APPLICATION_JSON);
+        headers.set("content-type", "application/json; charset=utf-8");
+        headers.set("authorization", kisAuthToken.getTokenType() + " " + kisAuthToken.getAccessToken());
+        headers.set("appkey", decodedAppkey);
+        headers.set("appsecret", decodedAppsecret);
+        headers.set("tr_id", tradeId);
+        headers.set("custtype", "P");
+
+        Map<String, String> bodyMap = new HashMap<>();
+        bodyMap.put("FID_INPUT_ISCD", indexCode.getIndexCode());
+        bodyMap.put("FID_COND_MRKT_DIV_CODE", "U");
+
+        String requestBodyJson;
+
+        try {
+            requestBodyJson = objectMapper.writeValueAsString(bodyMap);
+        } catch (JsonProcessingException e) {
+            throw new BusinessException(ErrorCode.INTERNAL_SERVER_ERROR, "데이터 변환에 실패했습니다.");
+        }
+        HttpEntity<String> request = new HttpEntity<>(requestBodyJson, headers);
+
+        try {
+            ResponseEntity<KisKoreaIndexDTO.KisKoreaIndexResponse> response =
+                    restTemplate.exchange(uri, HttpMethod.GET, request, KisKoreaIndexDTO.KisKoreaIndexResponse.class);
+
+            log.info("KIS 성공 응답: {}", response.getBody());
+            return response.getBody();
+
+
+        } catch (RestClientResponseException e) {
+            // 5. HTTP 4xx/5xx 오류 상세 로깅
+            log.error("KIS API 호출 실패 (HTTP {}): 요청 URI: {}, 응답 Body: {}",
+                    e.getStatusCode(), uri, e.getResponseBodyAsString(), e);
+            throw new BusinessException(ErrorCode.KIS_API_ERROR,
+                    String.format("KIS API 호출 실패. [HTTP %s] %s",
+                            e.getStatusCode(), e.getResponseBodyAsString()));
+        } catch (RestClientException e) {
+            // 6. RestTemplate 일반 오류 (네트워크, JSON 파싱 등) 상세 로깅
+            log.error("KIS API 호출 중 RestClient 오류 발생: {}", e.getMessage(), e);
+            throw new BusinessException(ErrorCode.KIS_API_ERROR,
+                    "KIS API 호출 중 오류가 발생했습니다: " + e.getMessage());
+        }
+    }
+
+
+
 }
