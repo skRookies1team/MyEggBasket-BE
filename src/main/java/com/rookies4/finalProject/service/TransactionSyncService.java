@@ -1,11 +1,13 @@
 package com.rookies4.finalProject.service;
 
+import com.rookies4.finalProject.domain.entity.Stock;
 import com.rookies4.finalProject.domain.entity.Transaction;
 import com.rookies4.finalProject.domain.entity.User;
 import com.rookies4.finalProject.domain.enums.TransactionStatus;
 import com.rookies4.finalProject.domain.enums.TransactionType;
 import com.rookies4.finalProject.dto.KisAuthTokenDTO;
 import com.rookies4.finalProject.dto.KisTransactionDto;
+import com.rookies4.finalProject.repository.StockRepository;
 import com.rookies4.finalProject.repository.TransactionRepository;
 import java.math.BigDecimal;
 import java.time.LocalDate;
@@ -28,12 +30,13 @@ public class TransactionSyncService {
     private final KisAuthService kisAuthService;
     private final KisOrderHistoryService kisOrderHistoryService;
     private final TransactionRepository transactionRepository;
+    private final StockRepository stockRepository;
 
     /**
      * 한투(KIS)와 주문 내역을 동기화한다.
      * - 1) 토큰 발급/재사용
      * - 2) 일간 주문 내역 조회
-     * - 3) DB(Transaction) upsert
+     * - 3) DB(Transaction Entity) upsert
      */
     @Transactional(propagation = Propagation.REQUIRES_NEW)
     public void syncUserOrdersFromKis(User user) {
@@ -83,15 +86,16 @@ public class TransactionSyncService {
         }
     }
 
-    /**
-     * KIS 주문 1건을 DB Transaction 으로 upsert
-     */
+    // KIS 주문 1건을 DB Transaction 으로 upsert
     private void upsertSingleOrder(User user, KisTransactionDto.KisOrderDetail kisOrder) {
         String orderNo = kisOrder.getOrderNo();
         if (orderNo == null || orderNo.isBlank()) {
             log.warn("[SYNC] 주문번호 없는 레코드 무시: userId={}, data={}", user.getId(), kisOrder);
             return;
         }
+
+        // KIS 응답으로부터 Stock upsert (중복키 존재 -> 업데이트, 중복키 부재 -> 삽입)
+        Stock stock = upsertStockFromKis(kisOrder);
 
         Optional<Transaction> optional =
                 transactionRepository.findByUser_IdAndOrderNo(user.getId(), orderNo);
@@ -100,9 +104,12 @@ public class TransactionSyncService {
                 Transaction.builder()
                         .user(user)
                         .orderNo(orderNo)
-                        // .stock(..) // TODO
                         .build()
         );
+
+        if (stock != null) {
+            transaction.setStock(stock);
+        }
 
         // 매수/매도 타입
         TransactionType type = mapType(kisOrder);
@@ -128,6 +135,32 @@ public class TransactionSyncService {
         transactionRepository.save(transaction);
         log.info("[SYNC] Transaction upsert 완료: userId={}, orderNo={}, status={}",
                 user.getId(), orderNo, transaction.getStatus());
+    }
+
+    private Stock upsertStockFromKis(KisTransactionDto.KisOrderDetail kisOrder) {
+        String stockCode = kisOrder.getStockCode();
+        if (stockCode == null || stockCode.isBlank()) {
+            return null;
+        }
+
+        String stockName = kisOrder.getStockName();
+
+        return stockRepository.findById(stockCode)
+                .map(existing -> {
+                    // 종목명이 바뀌었으면 업데이트
+                    if (stockName != null && !stockName.isBlank()
+                            && !stockName.equals(existing.getName())) {
+                        existing.setName(stockName);
+                    }
+                    return existing;
+                })
+                .orElseGet(() -> {
+                    Stock stock = Stock.builder()
+                            .stockCode(stockCode)
+                            .name(stockName != null ? stockName : "")
+                            .build();
+                    return stockRepository.save(stock);
+                });
     }
 
     private TransactionType mapType(KisTransactionDto.KisOrderDetail kisOrder) {
