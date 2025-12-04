@@ -83,14 +83,12 @@ public class KisForeignIndexService {
 
 
         } catch (RestClientResponseException e) {
-            // 5. HTTP 4xx/5xx 오류 상세 로깅
             log.error("KIS API 호출 실패 (HTTP {}): 요청 URI: {}, 응답 Body: {}",
                     e.getStatusCode(), uri, e.getResponseBodyAsString(), e);
             throw new BusinessException(ErrorCode.KIS_API_ERROR,
                     String.format("KIS API 호출 실패. [HTTP %s] %s",
                             e.getStatusCode(), e.getResponseBodyAsString()));
         } catch (RestClientException e) {
-            // 6. RestTemplate 일반 오류 (네트워크, JSON 파싱 등) 상세 로깅
             log.error("KIS API 호출 중 RestClient 오류 발생: {}", e.getMessage(), e);
             throw new BusinessException(ErrorCode.KIS_API_ERROR,
                     "KIS API 호출 중 오류가 발생했습니다: " + e.getMessage());
