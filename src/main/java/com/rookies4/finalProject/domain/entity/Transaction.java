@@ -23,7 +23,7 @@ public class Transaction {
     @Column(name = "transaction_id")
     private Long transactionId;
 
-    @ManyToOne(fetch = FetchType.LAZY, cascade = CascadeType.REMOVE)
+    @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "user_id")
     private User user;
 

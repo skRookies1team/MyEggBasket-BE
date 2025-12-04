@@ -7,6 +7,8 @@ import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 import java.time.LocalDateTime;
+import java.util.ArrayList;
+import java.util.List;
 
 @Entity
 @Table(name = "users")
@@ -55,6 +57,18 @@ public class User {
     // FCM 토큰
     @Column(name = "fcm_token", length = 255)
     private String fcmToken;
+
+    @OneToMany(mappedBy = "user", cascade = CascadeType.REMOVE, orphanRemoval = true)
+    private List<InterestStock> interestStocks = new ArrayList<>();
+
+    @OneToOne(mappedBy = "user", cascade = CascadeType.REMOVE, orphanRemoval = true)
+    private KisAuthToken kisAuthToken = new KisAuthToken();
+
+    @OneToMany(mappedBy = "user", cascade = CascadeType.REMOVE, orphanRemoval = true)
+    private List<Portfolio> portfolios = new ArrayList<>();
+
+    @OneToMany(mappedBy = "user", cascade = CascadeType.REMOVE, orphanRemoval = true)
+    private List<Transaction> transactions = new ArrayList<>();
 
     // created_at(TIMESTAMP DEFAULT CURRENT_TIMESTAMP)에 매핑
     // 생성 시각
