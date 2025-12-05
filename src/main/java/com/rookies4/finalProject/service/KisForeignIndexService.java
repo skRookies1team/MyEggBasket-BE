@@ -6,6 +6,7 @@ import com.rookies4.finalProject.config.KisApiConfig;
 import com.rookies4.finalProject.domain.entity.KisAuthToken;
 import com.rookies4.finalProject.domain.entity.User;
 import com.rookies4.finalProject.dto.KisForeignIndexDTO;
+import com.rookies4.finalProject.dto.KisKoreaIndexDTO;
 import com.rookies4.finalProject.exception.BusinessException;
 import com.rookies4.finalProject.exception.ErrorCode;
 import com.rookies4.finalProject.repository.KisAuthRepository;
@@ -32,7 +33,6 @@ public class KisForeignIndexService {
 
     private final RestTemplate restTemplate;
     private final KisAuthRepository kisAuthRepository;
-    private final ObjectMapper objectMapper;
 
 
     public KisForeignIndexDTO.KisForeignIndexResponse showForeignIndex(
@@ -58,37 +58,37 @@ public class KisForeignIndexService {
         headers.set("appsecret", decodedAppsecret);
         headers.set("tr_id", tradeId);
 
+        Map<String, String> params = new HashMap<>();
+        params.put("FID_COND_MRKT_DIV_CODE", "N"); // 코스피/코스닥 코드 (예: 1001)
+        params.put("FID_INPUT_ISCD", indexCode.getIndexCode());
+        params.put("FID_HOUR_CLS_CODE", "0");
+        params.put("FID_PW_DATA_INCU_YN", "N");
 
-        Map<String, String> bodyMap = new HashMap<>();
-        bodyMap.put("FID_COND_MRKT_DIV_CODE", "N");
-        bodyMap.put("FID_INPUT_ISCD", indexCode.getIndexCode()); // DTO 필드명 수정 (indexCode -> fidInputIscd)
-        bodyMap.put("FID_HOUR_CLS_CODE", "0");
-        bodyMap.put("FID_PW_DATA_INCU_YN", "N");
+        HttpEntity<Void> request = new HttpEntity<>(headers);
+        URI uriWithParams = KisApiConfig.uri(false, path, params);
 
-        String requestBodyJson;
-        try {
-            requestBodyJson = objectMapper.writeValueAsString(bodyMap);
-        } catch (JsonProcessingException e) {
-            throw new BusinessException(ErrorCode.INTERNAL_SERVER_ERROR, "데이터 변환에 실패했습니다.");
-        }
-
-        HttpEntity<String> request = new HttpEntity<>(requestBodyJson, headers);
 
         try {
+            ResponseEntity<String> responseString =
+                    restTemplate.exchange(uriWithParams, HttpMethod.GET, request, String.class);
+
             ResponseEntity<KisForeignIndexDTO.KisForeignIndexResponse> response =
-                    restTemplate.exchange(uri, HttpMethod.GET, request, KisForeignIndexDTO.KisForeignIndexResponse.class);
+                    restTemplate.exchange(uriWithParams, HttpMethod.GET, request, KisForeignIndexDTO.KisForeignIndexResponse.class);
 
             log.info("KIS 성공 응답: {}", response.getBody());
+            log.info("KIS String 응답 : {}", responseString.getBody());
             return response.getBody();
 
 
         } catch (RestClientResponseException e) {
+            // 5. HTTP 4xx/5xx 오류 상세 로깅
             log.error("KIS API 호출 실패 (HTTP {}): 요청 URI: {}, 응답 Body: {}",
-                    e.getStatusCode(), uri, e.getResponseBodyAsString(), e);
+                    e.getStatusCode(), uriWithParams, e.getResponseBodyAsString(), e);
             throw new BusinessException(ErrorCode.KIS_API_ERROR,
                     String.format("KIS API 호출 실패. [HTTP %s] %s",
                             e.getStatusCode(), e.getResponseBodyAsString()));
         } catch (RestClientException e) {
+            // 6. RestTemplate 일반 오류 (네트워크, JSON 파싱 등) 상세 로깅
             log.error("KIS API 호출 중 RestClient 오류 발생: {}", e.getMessage(), e);
             throw new BusinessException(ErrorCode.KIS_API_ERROR,
                     "KIS API 호출 중 오류가 발생했습니다: " + e.getMessage());

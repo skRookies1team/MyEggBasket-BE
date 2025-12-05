@@ -54,7 +54,11 @@ public class KisForeignIndexDTO {
     // 리스트 구조를 유지하기 위해 클래스는 정의하되, 필드는 넣지 않거나 필요한 최소 필드만 정의합니다.
     @Data
     @Builder
+    @NoArgsConstructor
+    @AllArgsConstructor
     public static class ResponseOutput2 {
+        @JsonProperty("stck_cntg_hour")
+        private String time;
     }
 
     @Data
