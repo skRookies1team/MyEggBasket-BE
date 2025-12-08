@@ -50,18 +50,4 @@ public class UserController {
         userService.deleteUser(userId);
         return ResponseEntity.noContent().build();
     }
-
-    // 6. 주문/거래 내역 조회
-    // GET /api/app/users/{userId}/orders?status=pending (미체결)
-    // GET /api/app/users/{userId}/orders?status=completed (체결)
-    // GET /api/app/users/{userId}/orders?status=cancelled (취소)
-    // GET /api/app/users/{userId}/orders (전체)
-    @GetMapping("/{userId}/orders")
-    public ResponseEntity<List<TransactionDTO.Response>> getUserOrders (
-            @PathVariable Long userId,
-            @RequestParam(required = false) String status) { // status 는 필수 아님 (nullable)
-        List<TransactionDTO.Response> result =
-                transactionService.getUserOrders(userId, status);
-        return ResponseEntity.ok(result);
-    }
 }
