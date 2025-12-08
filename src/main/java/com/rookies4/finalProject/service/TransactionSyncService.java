@@ -39,18 +39,16 @@ public class TransactionSyncService {
      * - 3) DB(Transaction Entity) upsert
      */
     @Transactional(propagation = Propagation.REQUIRES_NEW)
-    public void syncUserOrdersFromKis(User user) {
-        // TODO: 실제 환경에 맞게 모의/실거래 여부를 User 설정값 등에서 가져오도록 변경
-        boolean useVirtual = true;
+    public void syncUserOrdersFromKis(User user, boolean useVirtualServer) {
 
         KisAuthTokenDTO.KisTokenResponse tokenResponse =
-                kisAuthService.issueToken(useVirtual, user);
+                kisAuthService.issueToken(useVirtualServer, user);
 
         String accessToken = tokenResponse.getAccessToken();
         log.info("[SYNC] 토큰 준비 완료, userId={}", user.getId());
 
         KisTransactionDto kisResponse =
-                kisOrderHistoryService.getDailyOrderHistory(user, accessToken, useVirtual);
+                kisOrderHistoryService.getDailyOrderHistory(user, accessToken, useVirtualServer);
 
         // 1) 응답 자체가 null
         if (kisResponse == null) {

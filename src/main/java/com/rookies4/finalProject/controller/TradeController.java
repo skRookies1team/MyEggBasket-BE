@@ -65,7 +65,7 @@ public class TradeController {
         }
 
         List<TransactionDTO.Response> result =
-                transactionService.getUserOrders(currentUserId, status);
+                transactionService.getUserOrders(currentUserId, status, useVirtualServer);
         return ResponseEntity.ok(result);
     }
 }
