@@ -56,6 +56,7 @@ public class TradeController {
     // 2. 거래/주문 내역 조회 (로그인 유저 기준)
     @GetMapping("/history")
     public ResponseEntity<List<TransactionDTO.Response>> getTradeHistory(
+            @RequestParam(name = "virtual", defaultValue = "false") boolean useVirtualServer,
             @RequestParam(required = false) String status) { // status 는 필수 아님 (nullable)
 
         Long currentUserId = SecurityUtil.getCurrentUserId();
