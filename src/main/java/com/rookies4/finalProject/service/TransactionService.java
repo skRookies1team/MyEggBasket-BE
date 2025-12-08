@@ -32,16 +32,7 @@ public class TransactionService {
      * - 동기화 실패해도 DB에 있는 데이터는 그대로 반환
      */
     @Transactional(readOnly = true)
-    public List<TransactionDTO.Response> getUserOrders(Long userId, String statusParam) {
-
-        // 1. 권한 확인
-        Long currentUserId = SecurityUtil.getCurrentUserId();
-        if (currentUserId == null) {
-            throw new BusinessException(ErrorCode.UNAUTHORIZED, "로그인이 필요합니다.");
-        }
-        if (!currentUserId.equals(userId)) {
-            throw new BusinessException(ErrorCode.AUTH_ACCESS_DENIED, "해당 사용자의 주문 내역에 접근할 권한이 없습니다.");
-        }
+    public List<TransactionDTO.Response> getUserOrders(Long userId, String status, boolean useVirtualServer) {
 
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new BusinessException(
@@ -51,7 +42,7 @@ public class TransactionService {
 
         // 2. KIS API 동기화 (주문 내역 조회 시마다 갱신)
         try {
-            transactionSyncService.syncUserOrdersFromKis(user);
+            transactionSyncService.syncUserOrdersFromKis(user, useVirtualServer);
         } catch (Exception e) {
             log.warn("KIS 주문 내역 동기화 실패, DB 데이터만 사용. userId={}, msg={}",
                     userId, e.getMessage());
@@ -59,8 +50,8 @@ public class TransactionService {
 
         // 3. DB 조회 (동기화 끝난 최신 데이터 조회)
         TransactionStatus statusFilter = null;
-        if (statusParam != null && !statusParam.isBlank()) {
-            statusFilter = parseStatus(statusParam);
+        if (status != null && !status.isBlank()) {
+            statusFilter = parseStatus(status);
         }
 
         List<Transaction> transactions;
