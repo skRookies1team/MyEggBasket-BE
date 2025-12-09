@@ -25,6 +25,7 @@ public class TradeController {
 
     private final KisStockOrderService kisStockOrderService;
     private final TransactionService transactionService;
+    private final BalanceService balanceService;
     private final UserRepository userRepository;
 
     // 1. 매수/매도 주문

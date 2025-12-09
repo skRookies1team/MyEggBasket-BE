@@ -4,7 +4,7 @@ import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.rookies4.finalProject.config.KisApiConfig;
 import com.rookies4.finalProject.domain.entity.User;
-import com.rookies4.finalProject.dto.KisTransactionDto;
+import com.rookies4.finalProject.dto.KisTransactionDTO;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -27,17 +27,15 @@ import java.util.Base64;
 @Slf4j
 @Service
 @RequiredArgsConstructor
-public class KisOrderHistoryService {
+public class KisTransactionService {
 
     private static final String ACCOUNT_PRODUCT_CODE = "01"; // 일반 위탁계좌 상품 코드 (계좌번호 뒷 2자리)
 
     private final RestTemplate restTemplate;
     private final ObjectMapper objectMapper; // 스프링 기본 ObjectMapper 주입
 
-    /**
-     * 한국투자증권 [주식일별주문체결조회] API 호출
-     */
-    public KisTransactionDto getDailyOrderHistory(User user, String accessToken, boolean useVirtual) {
+    // 한국투자증권 [주식일별주문체결조회] API 호출
+    public KisTransactionDTO getDailyOrderHistory(User user, String accessToken, boolean useVirtual) {
 
         // 1. URL 설정
         String path = "/uapi/domestic-stock/v1/trading/inquire-daily-ccld";
@@ -104,12 +102,12 @@ public class KisOrderHistoryService {
 
             if (bodyStr == null || bodyStr.isBlank()) {
                 log.warn("[KIS_ORDER] 주문내역 조회 응답 body 가 비어있음, userId={}", user.getId());
-                return new KisTransactionDto();
+                return new KisTransactionDTO();
             }
 
             // 2) DTO로 파싱 (output1 매핑)
             objectMapper.configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false);
-            KisTransactionDto dto = objectMapper.readValue(bodyStr, KisTransactionDto.class);
+            KisTransactionDTO dto = objectMapper.readValue(bodyStr, KisTransactionDTO.class);
 
             log.info("[KIS_ORDER] 파싱 결과: rt_cd={}, msg_cd={}, msg1={}, output1.size={}",
                     dto.getRtCd(),
@@ -122,13 +120,13 @@ public class KisOrderHistoryService {
         } catch (RestClientResponseException e) {
             log.error("[KIS_ORDER] 주문내역 조회 실패 (HTTP {}): {}, userId={}",
                     e.getStatusCode(), e.getResponseBodyAsString(), user.getId(), e);
-            return new KisTransactionDto();
+            return new KisTransactionDTO();
         } catch (RestClientException e) {
             log.error("[KIS_ORDER] 주문내역 조회 중 오류: {}, userId={}", e.getMessage(), user.getId(), e);
-            return new KisTransactionDto();
+            return new KisTransactionDTO();
         } catch (Exception e) {
             log.error("[KIS_ORDER] 응답 파싱 실패: {}, userId={}", e.getMessage(), user.getId(), e);
-            return new KisTransactionDto();
+            return new KisTransactionDTO();
         }
     }
 
