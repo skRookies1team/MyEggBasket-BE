@@ -1,12 +1,15 @@
 package com.rookies4.finalProject.controller;
 
 import com.rookies4.finalProject.domain.entity.User;
+import com.rookies4.finalProject.dto.BalanceDTO;
+import com.rookies4.finalProject.dto.KisBalanceDTO;
 import com.rookies4.finalProject.dto.KisStockOrderDTO;
 import com.rookies4.finalProject.dto.TransactionDTO;
 import com.rookies4.finalProject.exception.BusinessException;
 import com.rookies4.finalProject.exception.ErrorCode;
 import com.rookies4.finalProject.repository.UserRepository;
 import com.rookies4.finalProject.security.SecurityUtil;
+import com.rookies4.finalProject.service.BalanceService;
 import com.rookies4.finalProject.service.KisStockOrderService;
 import com.rookies4.finalProject.service.TransactionService;
 import java.util.List;
@@ -68,5 +71,21 @@ public class TradeController {
         List<TransactionDTO.Response> result =
                 transactionService.getUserOrders(currentUserId, status, useVirtualServer);
         return ResponseEntity.ok(result);
+    }
+
+    // 3. 잔고 조회 (보유 주식, 현금 등)
+    @GetMapping("/balance")
+    public ResponseEntity<KisBalanceDTO> getAccountBalance(
+            @RequestParam(name = "virtual", defaultValue = "false") boolean useVirtualServer) {
+
+        Long currentUserId = SecurityUtil.getCurrentUserId();
+        if (currentUserId == null) {
+            throw new BusinessException(ErrorCode.AUTH_ACCESS_DENIED, "로그인이 필요합니다.");
+        }
+
+        // KIS 잔고 조회
+        BalanceDTO balance = balanceService.getBalance(currentUserId, useVirtualServer);
+
+        return ResponseEntity.ok(balance);
     }
 }
