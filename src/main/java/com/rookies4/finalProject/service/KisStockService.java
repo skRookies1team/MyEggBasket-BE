@@ -91,6 +91,7 @@ public class KisStockService {
                     .openPrice(parseDouble(output.get("stck_oprc")))
                     .highPrice(parseDouble(output.get("stck_hgpr")))
                     .lowPrice(parseDouble(output.get("stck_lwpr")))
+                    .closePrice(parseDouble(output.get("stck_clpr")))
                     .updatedAt(LocalDateTime.now())
                     .build();
 
