@@ -66,7 +66,8 @@ public class SecurityConfig {
                                 "/api/users",
                                 "/api/auth/**",
                                 "/api/app/stocks/**",// [추가됨] 주식 관련 API 허용
-                                "/api/app/kis/stock/**"
+                                "/api/app/kis/stock/**",
+                                "/api/app/kis/rank/**"
                         ).permitAll()
                         .requestMatchers("/swagger-ui/**", "/v3/api-docs/**", "/swagger-resources/**").permitAll()
                         .requestMatchers("/actuator/**").permitAll()
