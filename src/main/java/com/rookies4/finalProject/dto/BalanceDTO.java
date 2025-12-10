@@ -39,10 +39,10 @@ public class BalanceDTO {
         private String stockName;
 
         // 보유수량 (KIS: hldg_qty)
-        private Long quantity;
+        private Integer quantity;
 
         // 주문가능수량 (KIS: ord_psbl_qty)
-        private Long orderableQuantity;
+        private Integer orderableQuantity;
 
         // 매입평균가격 (KIS: pchs_avg_pric)
         private BigDecimal avgPrice;

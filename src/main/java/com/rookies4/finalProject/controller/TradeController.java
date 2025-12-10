@@ -2,7 +2,6 @@ package com.rookies4.finalProject.controller;
 
 import com.rookies4.finalProject.domain.entity.User;
 import com.rookies4.finalProject.dto.BalanceDTO;
-import com.rookies4.finalProject.dto.KisBalanceDTO;
 import com.rookies4.finalProject.dto.KisStockOrderDTO;
 import com.rookies4.finalProject.dto.TransactionDTO;
 import com.rookies4.finalProject.exception.BusinessException;
@@ -75,7 +74,7 @@ public class TradeController {
 
     // 3. 잔고 조회 (보유 주식, 현금 등)
     @GetMapping("/balance")
-    public ResponseEntity<KisBalanceDTO> getAccountBalance(
+    public ResponseEntity<BalanceDTO.Response> getAccountBalance(
             @RequestParam(name = "virtual", defaultValue = "false") boolean useVirtualServer) {
 
         Long currentUserId = SecurityUtil.getCurrentUserId();
@@ -84,7 +83,7 @@ public class TradeController {
         }
 
         // KIS 잔고 조회
-        BalanceDTO balance = balanceService.getBalance(currentUserId, useVirtualServer);
+        BalanceDTO.Response balance = balanceService.getUserBalance(currentUserId, useVirtualServer);
 
         return ResponseEntity.ok(balance);
     }

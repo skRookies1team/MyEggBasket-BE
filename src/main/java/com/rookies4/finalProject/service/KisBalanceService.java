@@ -48,11 +48,11 @@ public class KisBalanceService {
         headers.set("appkey", decodeBase64(user.getAppkey())); // 암호화된 appkey 디코딩해서 삽입
         headers.set("appsecret", decodeBase64(user.getAppsecret())); // 암호화된 appsecret 디코딩해서 삽입
 
-        // TR_ID 설정 (실전: TTTC8001R, 모의: VTTC8001R)
+        // TR_ID 설정 (실전: TTTC8434R, 모의: VTTC8434R)
         if (useVirtual) {
-            headers.set("tr_id", "VTTC0081R");
+            headers.set("tr_id", "VTTC8434R");
         } else {
-            headers.set("tr_id", "TTTC0081R");
+            headers.set("tr_id", "TTTC8434R");
         }
 
         // 고객 타입: 개인(P) / 법인(B) — Required=Y
@@ -67,7 +67,7 @@ public class KisBalanceService {
                 .queryParam("ACNT_PRDT_CD", ACCOUNT_PRODUCT_CODE) // 계좌상품코드 (뒤 2자리)
                 .queryParam("AFHR_FLPR_YN", "N")                 // 시간외단일가, 거래소여부 (N: 기본값)
                 .queryParam("OFL_YN", "")                        // 오프라인 여부 (공란: 기본값)
-                .queryParam("INQR_DVSN", "01")                   // 조회구분 (01: 대출일별, 02: 종목별) - 필요시 변경
+                .queryParam("INQR_DVSN", "02")                   // 조회구분 (01: 대출일별, 02: 종목별)
                 .queryParam("UNPR_DVSN", "01")                   // 단가구분 (01: 기본값)
                 .queryParam("FUND_STTL_ICLD_YN", "N")            // 펀드결제분 포함여부 (N: 포함하지 않음)
                 .queryParam("FNCG_AMT_AUTO_RDPT_YN", "N")        // 융자금액 자동상환 여부 (N: 기본값)
