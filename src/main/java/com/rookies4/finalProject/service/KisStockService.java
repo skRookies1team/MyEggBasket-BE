@@ -8,6 +8,7 @@ import com.rookies4.finalProject.exception.BusinessException;
 import com.rookies4.finalProject.exception.ErrorCode;
 import com.rookies4.finalProject.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.*;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -15,14 +16,17 @@ import org.springframework.web.client.RestClientException;
 import org.springframework.web.client.RestTemplate;
 import org.springframework.web.util.UriComponentsBuilder;
 
+import java.math.BigDecimal;
 import java.net.URI;
 import java.nio.charset.StandardCharsets;
+import java.time.LocalDateTime;
 import java.util.Base64;
 import java.util.Map;
 
+@Slf4j
 @Service
 @RequiredArgsConstructor
-@Transactional
+@Transactional(readOnly = true)
 public class KisStockService {
 
     private final RestTemplate restTemplate;
@@ -35,12 +39,15 @@ public class KisStockService {
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new BusinessException(ErrorCode.USER_NOT_FOUND));
 
-        // 2. 토큰 발급
+        // 2. 종목코드 기본 형식 검증
+        validateStockCodeFormat(stockCode);
+
+        // 3. 토큰 발급
         KisAuthTokenDTO.KisTokenResponse tokenResponse =
                 kisAuthService.issueToken(useVirtualServer, user);
         String accessToken = tokenResponse.getAccessToken();
 
-        // 3. KIS API 호출
+        // 4. KIS API 호출
         String path = "/uapi/domestic-stock/v1/quotations/inquire-price";
         URI uri = KisApiConfig.uri(useVirtualServer, path);
 
@@ -75,14 +82,16 @@ public class KisStockService {
 
             return CurrentPriceDTO.builder()
                     .stockCode(stockCode)
-                    .currentPrice(parseNumber(output.get("stck_prpr")))
-                    .changeAmount(parseNumber(output.get("prdy_vrss")))
-                    .changeRate(parseNumber(output.get("prdy_ctrt")))
-                    .volume(parseNumber(output.get("acml_vol")))
-                    .tradingValue(parseNumber(output.get("acml_tr_pbmn")))
-                    .openPrice(parseNumber(output.get("stck_oprc")))
-                    .highPrice(parseNumber(output.get("stck_hgpr")))
-                    .lowPrice(parseNumber(output.get("stck_lwpr")))
+                    .stockName((String) output.get("hts_kor_isnm"))
+                    .currentPrice(parseBigDecimal(output.get("stck_prpr")))
+                    .changeAmount(parseDouble(output.get("prdy_vrss")))
+                    .changeRate(parseDouble(output.get("prdy_ctrt")))
+                    .volume(parseLong(output.get("acml_vol")))
+                    .tradingValue(parseDouble(output.get("acml_tr_pbmn")))
+                    .openPrice(parseDouble(output.get("stck_oprc")))
+                    .highPrice(parseDouble(output.get("stck_hgpr")))
+                    .lowPrice(parseDouble(output.get("stck_lwpr")))
+                    .updatedAt(LocalDateTime.now())
                     .build();
 
         } catch (RestClientException e) {
@@ -90,10 +99,34 @@ public class KisStockService {
                     "KIS API 호출 실패: " + e.getMessage());
         }
     }
+     // 종목코드 형식 검증
+    private void validateStockCodeFormat(String stockCode) {
+        if (stockCode == null || stockCode.trim().isEmpty()) {
+            throw new BusinessException(ErrorCode.VALIDATION_ERROR, "종목코드를 입력해주세요.");
+        }
 
-    private Double parseNumber(Object value) {
+        // 6자리 숫자 형식 확인
+        if (!stockCode.matches("^\\d{6}$")) {
+            throw new BusinessException(ErrorCode.VALIDATION_ERROR,
+                    "올바른 종목코드 형식이 아닙니다. (6자리 숫자 필요)");
+        }
+    }
+
+    private Double parseDouble(Object value) {
         if (value == null) return 0.0;
         return Double.parseDouble(String.valueOf(value).replace(",", ""));
+    }
+
+    private BigDecimal parseBigDecimal(Object value) {
+        if (value == null) return BigDecimal.ZERO;
+        return new BigDecimal(String.valueOf(value).replace(",", ""));
+    }
+
+
+
+    private Long parseLong(Object value) {
+        if (value == null) return 0L;
+        return Long.parseLong(String.valueOf(value).replace(",", ""));
     }
 
     private String decodeBase64(String encoded) {
