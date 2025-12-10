@@ -7,7 +7,7 @@ import lombok.Data;
 
 @Data
 @JsonIgnoreProperties(ignoreUnknown = true)
-public class KisTransactionDto {
+public class KisTransactionDTO {
 
     /** 성공/실패 여부 (rt_cd) */
     @JsonProperty("rt_cd")
