@@ -24,6 +24,7 @@ public class CurrentPriceDTO {
     private Double openPrice;        // 시가
     private Double highPrice;        // 고가
     private Double lowPrice;         // 저가
+    private Double closePrice;       //종가
     @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss")
     private LocalDateTime updatedAt;     // 시세 갱신 시각
 }

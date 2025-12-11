@@ -1,9 +1,9 @@
 package com.rookies4.finalProject.service;
 
 import com.rookies4.finalProject.config.KisApiConfig;
+import com.rookies4.finalProject.domain.entity.User;
 import com.rookies4.finalProject.dto.CurrentPriceDTO;
 import com.rookies4.finalProject.dto.KisAuthTokenDTO;
-import com.rookies4.finalProject.domain.entity.User;
 import com.rookies4.finalProject.exception.BusinessException;
 import com.rookies4.finalProject.exception.ErrorCode;
 import com.rookies4.finalProject.repository.UserRepository;
@@ -73,17 +73,24 @@ public class KisStockService {
             );
 
             Map<String, Object> body = response.getBody();
-            if (!"0".equals(body.get("rt_cd"))) {
-                throw new BusinessException(ErrorCode.KIS_API_ERROR,
-                        "현재가 조회 실패: " + body.get("msg1"));
+            if (body == null || !"0".equals(body.get("rt_cd"))) {
+                String msg = body != null ? (String) body.get("msg1") : "응답이 없습니다.";
+                throw new BusinessException(ErrorCode.KIS_API_ERROR, "현재가 조회 실패: " + msg);
             }
 
             Map<String, Object> output = (Map<String, Object>) body.get("output");
+            if (output == null) {
+                throw new BusinessException(ErrorCode.KIS_API_ERROR, "현재가 조회 결과(output)가 없습니다.");
+            }
+
+            // 현재가 파싱
+            BigDecimal currentPrice = parseBigDecimal(output.get("stck_prpr"));
 
             return CurrentPriceDTO.builder()
                     .stockCode(stockCode)
-                    .stockName((String) output.get("hts_kor_isnm"))
-                    .currentPrice(parseBigDecimal(output.get("stck_prpr")))
+                    // inquire-price API는 종목명을 제공하지 않음. 필요 시 별도 API 호출 필요.
+                    .stockName(null) 
+                    .currentPrice(currentPrice)
                     .changeAmount(parseDouble(output.get("prdy_vrss")))
                     .changeRate(parseDouble(output.get("prdy_ctrt")))
                     .volume(parseLong(output.get("acml_vol")))
@@ -91,6 +98,8 @@ public class KisStockService {
                     .openPrice(parseDouble(output.get("stck_oprc")))
                     .highPrice(parseDouble(output.get("stck_hgpr")))
                     .lowPrice(parseDouble(output.get("stck_lwpr")))
+                    // 종가(closePrice)는 장 마감 후 현재가와 동일하므로 현재가로 설정
+                    .closePrice(currentPrice.doubleValue()) 
                     .updatedAt(LocalDateTime.now())
                     .build();
 
@@ -99,13 +108,11 @@ public class KisStockService {
                     "KIS API 호출 실패: " + e.getMessage());
         }
     }
-     // 종목코드 형식 검증
+
     private void validateStockCodeFormat(String stockCode) {
         if (stockCode == null || stockCode.trim().isEmpty()) {
             throw new BusinessException(ErrorCode.VALIDATION_ERROR, "종목코드를 입력해주세요.");
         }
-
-        // 6자리 숫자 형식 확인
         if (!stockCode.matches("^\\d{6}$")) {
             throw new BusinessException(ErrorCode.VALIDATION_ERROR,
                     "올바른 종목코드 형식이 아닙니다. (6자리 숫자 필요)");
@@ -113,28 +120,27 @@ public class KisStockService {
     }
 
     private Double parseDouble(Object value) {
-        if (value == null) return 0.0;
+        if (value == null || String.valueOf(value).trim().isEmpty()) return 0.0;
         return Double.parseDouble(String.valueOf(value).replace(",", ""));
     }
 
     private BigDecimal parseBigDecimal(Object value) {
-        if (value == null) return BigDecimal.ZERO;
+        if (value == null || String.valueOf(value).trim().isEmpty()) return BigDecimal.ZERO;
         return new BigDecimal(String.valueOf(value).replace(",", ""));
     }
 
-
-
     private Long parseLong(Object value) {
-        if (value == null) return 0L;
+        if (value == null || String.valueOf(value).trim().isEmpty()) return 0L;
         return Long.parseLong(String.valueOf(value).replace(",", ""));
     }
 
     private String decodeBase64(String encoded) {
-        if (encoded == null || encoded.isEmpty()) return encoded;
+        if (encoded == null || encoded.isEmpty()) return null;
         try {
             return new String(Base64.getDecoder().decode(encoded), StandardCharsets.UTF_8);
         } catch (Exception e) {
-            return encoded;
+            log.error("Base64 디코딩 실패: {}", encoded, e);
+            throw new BusinessException(ErrorCode.INTERNAL_SERVER_ERROR, "잘못된 형식의 인증 정보입니다.");
         }
     }
 }
