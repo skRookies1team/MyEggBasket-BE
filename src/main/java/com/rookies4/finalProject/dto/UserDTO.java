@@ -65,6 +65,8 @@ public class UserDTO {
         private Long id;
         private String email;
         private String username;
+        private String appkey;
+        private String appsecret;
         private LocalDateTime createdAt;
         private LocalDateTime updatedAt;
 
@@ -74,6 +76,8 @@ public class UserDTO {
                     .id(user.getId())
                     .email(user.getEmail())
                     .username(user.getUsername())
+                    .appkey(user.getAppkey())
+                    .appsecret(user.getAppsecret())
                     .createdAt(user.getCreatedAt())
                     .updatedAt(user.getUpdatedAt())
                     .build();
