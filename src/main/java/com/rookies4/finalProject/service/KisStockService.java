@@ -1,11 +1,13 @@
 package com.rookies4.finalProject.service;
 
 import com.rookies4.finalProject.config.KisApiConfig;
+import com.rookies4.finalProject.domain.entity.Stock;
 import com.rookies4.finalProject.domain.entity.User;
 import com.rookies4.finalProject.dto.CurrentPriceDTO;
 import com.rookies4.finalProject.dto.KisAuthTokenDTO;
 import com.rookies4.finalProject.exception.BusinessException;
 import com.rookies4.finalProject.exception.ErrorCode;
+import com.rookies4.finalProject.repository.StockRepository;
 import com.rookies4.finalProject.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -31,6 +33,7 @@ public class KisStockService {
 
     private final RestTemplate restTemplate;
     private final UserRepository userRepository;
+    private final StockRepository stockRepository; // StockRepository 주입
     private final KisAuthService kisAuthService;
 
     public CurrentPriceDTO getCurrentPrice(String stockCode, boolean useVirtualServer, Long userId) {
@@ -83,13 +86,17 @@ public class KisStockService {
                 throw new BusinessException(ErrorCode.KIS_API_ERROR, "현재가 조회 결과(output)가 없습니다.");
             }
 
+            // 5. DB에서 종목명 조회
+            String stockName = stockRepository.findById(stockCode)
+                    .map(Stock::getName)
+                    .orElse(null); // DB에 없으면 null
+
             // 현재가 파싱
             BigDecimal currentPrice = parseBigDecimal(output.get("stck_prpr"));
 
             return CurrentPriceDTO.builder()
                     .stockCode(stockCode)
-                    // inquire-price API는 종목명을 제공하지 않음. 필요 시 별도 API 호출 필요.
-                    .stockName(null) 
+                    .stockName(stockName) // DB에서 조회한 종목명 설정
                     .currentPrice(currentPrice)
                     .changeAmount(parseDouble(output.get("prdy_vrss")))
                     .changeRate(parseDouble(output.get("prdy_ctrt")))
@@ -98,8 +105,7 @@ public class KisStockService {
                     .openPrice(parseDouble(output.get("stck_oprc")))
                     .highPrice(parseDouble(output.get("stck_hgpr")))
                     .lowPrice(parseDouble(output.get("stck_lwpr")))
-                    // 종가(closePrice)는 장 마감 후 현재가와 동일하므로 현재가로 설정
-                    .closePrice(currentPrice.doubleValue()) 
+                    .closePrice(currentPrice.doubleValue())
                     .updatedAt(LocalDateTime.now())
                     .build();
 
