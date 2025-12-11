@@ -15,7 +15,6 @@ import java.io.BufferedReader;
 import java.io.IOException;
 import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
-import java.nio.file.Files;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -35,7 +34,7 @@ public class MasterStockRunner implements CommandLineRunner {
 
         // 1. 업종명(Sector) 매핑 데이터 로드 (KOSDAQ, KOSPI)
         Map<String, String> sectorMap = new HashMap<>();
-        loadSectorData(sectorMap, "data/data_sector_KOSDOQ.csv");
+        loadSectorData(sectorMap, "data/data_sector_KOSDAQ.csv");
         loadSectorData(sectorMap, "data/data_sector_KOSPI.csv");
 
         // 2. 업종코드(IndustryCode) 매핑 데이터 로드
