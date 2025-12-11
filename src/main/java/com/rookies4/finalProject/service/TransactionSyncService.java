@@ -6,7 +6,7 @@ import com.rookies4.finalProject.domain.entity.User;
 import com.rookies4.finalProject.domain.enums.TransactionStatus;
 import com.rookies4.finalProject.domain.enums.TransactionType;
 import com.rookies4.finalProject.dto.KisAuthTokenDTO;
-import com.rookies4.finalProject.dto.KisTransactionDto;
+import com.rookies4.finalProject.dto.KisTransactionDTO;
 import com.rookies4.finalProject.repository.StockRepository;
 import com.rookies4.finalProject.repository.TransactionRepository;
 import java.math.BigDecimal;
@@ -28,7 +28,7 @@ import org.springframework.transaction.annotation.Transactional;
 public class TransactionSyncService {
 
     private final KisAuthService kisAuthService;
-    private final KisOrderHistoryService kisOrderHistoryService;
+    private final KisTransactionService kisTransactionService;
     private final TransactionRepository transactionRepository;
     private final StockRepository stockRepository;
 
@@ -47,8 +47,8 @@ public class TransactionSyncService {
         String accessToken = tokenResponse.getAccessToken();
         log.info("[SYNC] 토큰 준비 완료, userId={}", user.getId());
 
-        KisTransactionDto kisResponse =
-                kisOrderHistoryService.getDailyOrderHistory(user, accessToken, useVirtualServer);
+        KisTransactionDTO kisResponse =
+                kisTransactionService.getDailyOrderHistory(user, accessToken, useVirtualServer);
 
         // 1) 응답 자체가 null
         if (kisResponse == null) {
@@ -57,7 +57,7 @@ public class TransactionSyncService {
         }
 
         // 2) output1 이 null
-        List<KisTransactionDto.KisOrderDetail> details = kisResponse.getOutput1();
+        List<KisTransactionDTO.KisOrderDetail> details = kisResponse.getOutput1();
         if (details == null) {
             log.warn("[SYNC] KIS 주문 내역 output1 == null, userId={}", user.getId());
             return;
@@ -72,7 +72,7 @@ public class TransactionSyncService {
         // 4) 정상적으로 n건 수신
         log.info("[SYNC] KIS 주문 내역 수신: userId={}, count={}", user.getId(), details.size());
 
-        for (KisTransactionDto.KisOrderDetail kisOrder : details) {
+        for (KisTransactionDTO.KisOrderDetail kisOrder : details) {
             log.debug("[SYNC] 수신 주문: odno={}, pdno={}, buySellCode={}, qty={}, filledQty={}",
                     kisOrder.getOrderNo(),
                     kisOrder.getStockCode(),
@@ -84,8 +84,8 @@ public class TransactionSyncService {
         }
     }
 
-    // KIS 주문 1건을 DB Transaction 으로 upsert
-    private void upsertSingleOrder(User user, KisTransactionDto.KisOrderDetail kisOrder) {
+    // KIS 주문 1건을 DB Transaction 으로 upsert(중복키 존재 -> 업데이트, 중복키 부재 -> 삽입)
+    private void upsertSingleOrder(User user, KisTransactionDTO.KisOrderDetail kisOrder) {
         String orderNo = kisOrder.getOrderNo();
         if (orderNo == null || orderNo.isBlank()) {
             log.warn("[SYNC] 주문번호 없는 레코드 무시: userId={}, data={}", user.getId(), kisOrder);
@@ -135,7 +135,7 @@ public class TransactionSyncService {
                 user.getId(), orderNo, transaction.getStatus());
     }
 
-    private Stock upsertStockFromKis(KisTransactionDto.KisOrderDetail kisOrder) {
+    private Stock upsertStockFromKis(KisTransactionDTO.KisOrderDetail kisOrder) {
         String stockCode = kisOrder.getStockCode();
         if (stockCode == null || stockCode.isBlank()) {
             return null;
@@ -161,7 +161,7 @@ public class TransactionSyncService {
                 });
     }
 
-    private TransactionType mapType(KisTransactionDto.KisOrderDetail kisOrder) {
+    private TransactionType mapType(KisTransactionDTO.KisOrderDetail kisOrder) {
         // 매도 = 01, 매수 = 02
         String code = kisOrder.getBuySellCode();
         if ("02".equals(code)) {

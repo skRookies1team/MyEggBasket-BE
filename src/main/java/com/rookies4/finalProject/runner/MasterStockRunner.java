@@ -2,9 +2,12 @@ package com.rookies4.finalProject.runner;
 
 import com.rookies4.finalProject.domain.entity.Stock;
 import com.rookies4.finalProject.repository.StockRepository;
+import java.io.InputStreamReader;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.CommandLineRunner;
+import org.springframework.core.io.ClassPathResource;
+import org.springframework.core.io.Resource;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -12,9 +15,6 @@ import java.io.BufferedReader;
 import java.io.IOException;
 import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
-import java.nio.file.Files;
-import java.nio.file.Path;
-import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -34,18 +34,18 @@ public class MasterStockRunner implements CommandLineRunner {
 
         // 1. 업종명(Sector) 매핑 데이터 로드 (KOSDAQ, KOSPI)
         Map<String, String> sectorMap = new HashMap<>();
-        loadSectorData(sectorMap, "data_sector_KOSDOQ.csv");
-        loadSectorData(sectorMap, "data_sector_KOSPI.csv");
+        loadSectorData(sectorMap, "data/data_sector_KOSDAQ.csv");
+        loadSectorData(sectorMap, "data/data_sector_KOSPI.csv");
 
         // 2. 업종코드(IndustryCode) 매핑 데이터 로드
         Map<String, String> industryCodeMap = new HashMap<>();
-        loadIndustryCodeData(industryCodeMap, "data_industry_code.csv");
+        loadIndustryCodeData(industryCodeMap, "data/data_industry_code.csv");
 
         // 3. 주식 기본 데이터(data_stock.csv) 로드 및 매핑
-        Path csvPath = Paths.get("data", "data_stock.csv");
+        Resource stockResource = new ClassPathResource("data/data_stock.csv");
 
-        if (!Files.exists(csvPath)) {
-            log.warn("CSV file not found: {}", csvPath);
+        if (!stockResource.exists()) {
+            log.warn("CSV file not found on classpath: data/data_stock.csv");
             return;
         }
 
@@ -55,9 +55,10 @@ public class MasterStockRunner implements CommandLineRunner {
         int skippedCount = 0;
 
         // 한국 CSV 파일은 보통 EUC-KR 또는 CP949 인코딩 사용
-        Charset charset = detectCharset(csvPath);
+        Charset charset = detectCharset(stockResource);
 
-        try (BufferedReader reader = Files.newBufferedReader(csvPath, charset)) {
+        try (BufferedReader reader =
+                     new BufferedReader(new InputStreamReader(stockResource.getInputStream(), charset))) {
             String line;
             boolean isFirstLine = true;
 
@@ -130,19 +131,25 @@ public class MasterStockRunner implements CommandLineRunner {
     /**
      * 업종명(Sector) 데이터를 로드하여 Map에 저장합니다.
      */
-    private void loadSectorData(Map<String, String> map, String fileName) {
-        Path path = Paths.get("data", fileName);
-        if (!Files.exists(path)) {
-            log.warn("{} not found, skipping sector loading for this file.", fileName);
+    private void loadSectorData(Map<String, String> map, String classpathLocation) {
+        Resource resource = new ClassPathResource(classpathLocation);
+
+        if (!resource.exists()) {
+            log.warn("{} not found, skipping sector loading for this file.", classpathLocation);
             return;
         }
 
-        Charset charset = detectCharset(path);
-        try (BufferedReader reader = Files.newBufferedReader(path, charset)) {
+        Charset charset = detectCharset(resource);
+
+        try (BufferedReader reader =
+                     new BufferedReader(new InputStreamReader(resource.getInputStream(), charset))) {
             String line;
             boolean isFirst = true;
             while ((line = reader.readLine()) != null) {
-                if (isFirst) { isFirst = false; continue; }
+                if (isFirst) {
+                    isFirst = false;
+                    continue;
+                }
                 String[] cols = parseCsvLine(line);
                 // data_sector_*.csv 구조: 0:종목코드, 1:종목명, 2:시장구분, 3:업종명, ...
                 if (cols.length > 3) {
@@ -151,28 +158,34 @@ public class MasterStockRunner implements CommandLineRunner {
                     map.put(code, sector);
                 }
             }
-            log.info("Loaded {} sector info from {}", map.size(), fileName);
+            log.info("Loaded {} sector info from {}", map.size(), classpathLocation);
         } catch (IOException e) {
-            log.error("Error reading {}", fileName, e);
+            log.error("Error reading {}", classpathLocation, e);
         }
     }
 
     /**
      * 업종코드(IndustryCode) 데이터를 로드하여 Map에 저장합니다.
      */
-    private void loadIndustryCodeData(Map<String, String> map, String fileName) {
-        Path path = Paths.get("data", fileName);
-        if (!Files.exists(path)) {
-            log.warn("{} not found, skipping industry code loading.", fileName);
+    private void loadIndustryCodeData(Map<String, String> map, String classpathLocation) {
+        Resource resource = new ClassPathResource(classpathLocation);
+
+        if (!resource.exists()) {
+            log.warn("{} not found on classpath, skipping industry code loading.", classpathLocation);
             return;
         }
 
-        Charset charset = detectCharset(path);
-        try (BufferedReader reader = Files.newBufferedReader(path, charset)) {
+        Charset charset = detectCharset(resource);
+
+        try (BufferedReader reader =
+                new BufferedReader(new InputStreamReader(resource.getInputStream(), charset))) {
             String line;
             boolean isFirst = true;
             while ((line = reader.readLine()) != null) {
-                if (isFirst) { isFirst = false; continue; }
+                if (isFirst) {
+                    isFirst = false;
+                    continue;
+                }
                 String[] cols = parseCsvLine(line);
                 // data_industry_code.csv 구조: 0:종목코드, ..., 5:업종코드, ...
                 if (cols.length > 5) {
@@ -181,9 +194,9 @@ public class MasterStockRunner implements CommandLineRunner {
                     map.put(code, indCode);
                 }
             }
-            log.info("Loaded {} industry codes from {}", map.size(), fileName);
+            log.info("Loaded {} industry codes from {}", map.size(), classpathLocation);
         } catch (IOException e) {
-            log.error("Error reading {}", fileName, e);
+            log.error("Error reading {}", classpathLocation, e);
         }
     }
 
@@ -191,15 +204,20 @@ public class MasterStockRunner implements CommandLineRunner {
      * CSV 파일의 인코딩을 감지합니다.
      * UTF-8을 먼저 시도하고, 실패하면 EUC-KR/CP949를 시도합니다.
      */
-    private Charset detectCharset(Path csvPath) {
-        Charset[] charsets = {StandardCharsets.UTF_8, Charset.forName("EUC-KR"), Charset.forName("CP949")};
+    private Charset detectCharset(Resource resource) {
+        Charset[] charsets = {
+                StandardCharsets.UTF_8,
+                Charset.forName("EUC-KR"),
+                Charset.forName("CP949")
+        };
 
         for (Charset charset : charsets) {
-            try (BufferedReader reader = Files.newBufferedReader(csvPath, charset)) {
+            try (BufferedReader reader =
+                         new BufferedReader(new InputStreamReader(resource.getInputStream(), charset))) {
                 // 처음 몇 줄만 읽어서 테스트
                 String line = reader.readLine();
                 if (line != null && !line.isEmpty()) {
-                    log.info("Using charset: {} for file: {}", charset, csvPath.getFileName());
+                    log.info("Using charset: {} for file: {}", charset, resource.getFilename());
                     return charset;
                 }
             } catch (IOException e) {
@@ -207,7 +225,7 @@ public class MasterStockRunner implements CommandLineRunner {
             }
         }
 
-        log.warn("Could not detect charset, using UTF-8 as default");
+        log.warn("Could not detect charset for {}, using UTF-8 as default", resource.getFilename());
         return StandardCharsets.UTF_8;
     }
 
@@ -242,9 +260,11 @@ public class MasterStockRunner implements CommandLineRunner {
      * CSV 값에서 큰따옴표를 제거하고 앞뒤 공백을 제거합니다.
      */
     private String cleanCsvValue(String value) {
-        if (value == null) return null;
+        if (value == null) {
+            return null;
+        }
         String cleaned = value.trim();
-        if (cleaned.startsWith("\"") && cleaned.endsWith("\"")) {
+        if (cleaned.startsWith("\"") && cleaned.endsWith("\"") && cleaned.length() >= 2) {
             cleaned = cleaned.substring(1, cleaned.length() - 1);
         }
         return cleaned;
