@@ -41,17 +41,17 @@ public class KisInvestorTrendController {
     }
 
     @GetMapping("/market")
+    @Operation(summary = "주요 종목 투자자 동향 일괄 조회", description = "지정된 주요 종목들의 투자자 동향을 일괄 조회합니다. (로그인 필요)")
     public ResponseEntity<List<KisInvestorTrendDTO.InvestorTrendResponse>>
     getMarketInvestorTrend() {
 
         Long userId = SecurityUtil.getCurrentUserId();
         if (userId == null) {
-            throw new BusinessException(ErrorCode.AUTH_ACCESS_DENIED);
+            throw new BusinessException(ErrorCode.AUTH_ACCESS_DENIED, "로그인이 필요합니다.");
         }
 
         return ResponseEntity.ok(
                 kisInvestorTrendService.getMarketInvestorTrend(userId)
         );
     }
-
 }
