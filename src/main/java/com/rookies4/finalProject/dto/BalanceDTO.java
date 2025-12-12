@@ -7,8 +7,18 @@ import lombok.Data;
 @Data
 public class BalanceDTO {
 
+    // output2
     @Data
     public static class Summary {
+
+        // 예수금총금액 (KIS: dnca_tot_amt)
+        private BigDecimal totalCashAmount;
+
+        // D+1 예수금 (KIS: nxdy_excc_amt)
+        private BigDecimal d1CashAmount;
+
+        // D+2 예수금 (KIS: prvs_rcdl_excc_amt)
+        private BigDecimal d2CashAmount;
 
         // 총평가금액 (KIS: tot_evlu_amt)
         private BigDecimal totalEvaluationAmount;
@@ -19,9 +29,6 @@ public class BalanceDTO {
         // 매입금액합계금액 (KIS: pchs_amt_smtl_amt)
         private BigDecimal totalPurchaseAmount;
 
-        // 예수금총금액 (KIS: dnca_tot_amt)
-        private BigDecimal cashAmount;
-
         // 순자산금액 (KIS: nass_amt)
         private BigDecimal netAssetAmount;
 
@@ -29,6 +36,7 @@ public class BalanceDTO {
         private BigDecimal profitRate;
     }
 
+    // output1
     @Data
     public static class Holding {
 
