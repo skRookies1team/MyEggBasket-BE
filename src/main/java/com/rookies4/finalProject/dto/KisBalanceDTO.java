@@ -154,11 +154,11 @@ public class KisBalanceDTO {
         @JsonProperty("dnca_tot_amt")
         private String dncaTotAmt;
 
-        // 익일정산금액
+        // 익일정산금액 (D+1 예수금)
         @JsonProperty("nxdy_excc_amt")
         private String nxdyExccAmt;
 
-        // 가수도정산금액
+        // 가수도정산금액 (D+2 예수금)
         @JsonProperty("prvs_rcdl_excc_amt")
         private String prvsRcdlExccAmt;
 
