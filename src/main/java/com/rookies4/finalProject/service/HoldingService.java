@@ -16,6 +16,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
 import java.util.stream.Collectors;
+import org.springframework.web.bind.annotation.PathVariable;
 
 @Service
 @RequiredArgsConstructor
@@ -126,9 +127,11 @@ public class HoldingService {
         return HoldingDTO.HoldingResponse.fromEntity(holding);
     }
 
-    //5. 보유 종목 삭제
-    public void deleteHolding(Long holdingId) {
-        Holding holding = holdingRepository.findById(holdingId)
+    //5. 포트폴리오에 있는 보유 종목 삭제
+    public void deleteHolding(Long portfolioId, Long holdingId) {
+        Portfolio portfolio = portfolioRepository.findById(portfolioId)
+                .orElseThrow(() -> new BusinessException(ErrorCode.PORTFOLIO_NOT_FOUND));
+        Holding holding = holdingRepository.findByPortfolioAndHoldingId(portfolio, holdingId)
                 .orElseThrow(() -> new BusinessException(ErrorCode.BUSINESS_RULE_VIOLATION, "보유 종목을 찾을 수 없습니다."));
 
         // 권한 확인: 포트폴리오 소유자만 삭제 가능
