@@ -21,8 +21,11 @@ import org.springframework.web.util.UriComponentsBuilder;
 
 import java.net.URI;
 import java.nio.charset.StandardCharsets;
-import java.util.*;
+import java.time.LocalTime;
+import java.util.ArrayList;
 import java.util.Base64;
+import java.util.List;
+import java.util.Objects;
 
 @Slf4j
 @Service
@@ -36,23 +39,16 @@ public class KisInvestorTrendService {
     private final KisAuthService kisAuthService;
     private final ObjectMapper objectMapper;
 
-    /**
-     * ==============================
-     * 1️ 단일 종목 투자자 동향 조회
-     * ==============================
-     */
     public KisInvestorTrendDTO.InvestorTrendResponse getInvestorTrend(String stockCode, Long userId) {
-
         // 1. 사용자 조회
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new BusinessException(ErrorCode.USER_NOT_FOUND));
 
-        // 2. KIS Access Token 발급 (실전 계좌)
-        KisAuthTokenDTO.KisTokenResponse tokenResponse =
-                kisAuthService.issueToken(false, user);
+        // 2. 토큰 발급 (실전투자 계좌로만 가능)
+        KisAuthTokenDTO.KisTokenResponse tokenResponse = kisAuthService.issueToken(false, user);
         String accessToken = tokenResponse.getAccessToken();
 
-        // 3. KIS API 호출 준비
+        // 3. KIS API 호출
         String path = "/uapi/domestic-stock/v1/quotations/inquire-investor";
         URI uri = KisApiConfig.uri(false, path);
 
@@ -64,95 +60,68 @@ public class KisInvestorTrendService {
         headers.set("authorization", "Bearer " + accessToken);
         headers.set("appkey", decodeBase64(user.getAppkey()));
         headers.set("appsecret", decodeBase64(user.getAppsecret()));
-        headers.set("tr_id", "FHKST01010900");
+        headers.set("tr_id", "FHKST01010900"); // 투자자별 매매동향
         headers.setContentType(MediaType.APPLICATION_JSON);
 
         HttpEntity<Void> requestEntity = new HttpEntity<>(headers);
 
         try {
-            ResponseEntity<Map> response = restTemplate.exchange(
+            ResponseEntity<KisInvestorTrendDTO.KisApiResponse> response = restTemplate.exchange(
                     builder.toUriString(),
                     HttpMethod.GET,
                     requestEntity,
-                    Map.class
+                    KisInvestorTrendDTO.KisApiResponse.class
             );
 
-            Map<String, Object> body = response.getBody();
-
-            // 디버깅 로그
-            log.info("KIS Investor Trend API Response: {}",
-                    objectMapper.writeValueAsString(body));
-
-            if (body == null || !"0".equals(body.get("rt_cd"))) {
-                throw new BusinessException(
-                        ErrorCode.KIS_API_ERROR,
-                        "투자자 동향 조회 실패: " + body
-                );
+            KisInvestorTrendDTO.KisApiResponse body = response.getBody();
+            if (body == null || !"0".equals(body.getRtCd()) || body.getOutput() == null || body.getOutput().isEmpty()) {
+                String msg = body != null ? body.getMsg1() : "응답이 없습니다.";
+                throw new BusinessException(ErrorCode.KIS_API_ERROR, "투자자 동향 조회 실패: " + msg);
             }
 
-            List<Map<String, Object>> outputList =
-                    (List<Map<String, Object>>) body.get("output");
+            // 4. 시간대별로 사용할 데이터 선택
+            List<KisInvestorTrendDTO.KisOutput> outputList = body.getOutput();
+            KisInvestorTrendDTO.KisOutput targetOutput;
 
-            // 종목명 조회 (DB 우선)
+            LocalTime now = LocalTime.now();
+            LocalTime marketCloseTime = LocalTime.of(16, 0); // 오후 4시
+
+            if (now.isBefore(marketCloseTime) && outputList.size() > 1) {
+                targetOutput = outputList.get(1); // 전일 데이터
+            } else {
+                targetOutput = outputList.get(0); // 당일 데이터
+            }
+
+            // 5. 데이터 가공
             String stockName = stockRepository.findById(stockCode)
                     .map(Stock::getName)
-                    .orElse(null);
+                    .orElse(targetOutput.getStockName());
 
             List<KisInvestorTrendDTO.InvestorInfo> investors = new ArrayList<>();
 
-            if (outputList == null || outputList.isEmpty()) {
-                // 데이터 없음 → 0으로 반환
-                investors.add(new KisInvestorTrendDTO.InvestorInfo("개인", 0L, 0L));
-                investors.add(new KisInvestorTrendDTO.InvestorInfo("외국인", 0L, 0L));
-                investors.add(new KisInvestorTrendDTO.InvestorInfo("기관", 0L, 0L));
-            } else {
-                Map<String, Object> validOutput = outputList.get(0);
+            investors.add(new KisInvestorTrendDTO.InvestorInfo("개인",
+                    parseLong(targetOutput.getPersonalNetBuyQty()),
+                    parseLong(targetOutput.getPersonalNetBuyAmount()) * 1_000_000));
 
-                // 0이 아닌 데이터 우선 선택
-                for (Map<String, Object> output : outputList) {
-                    if (parseLong(output.get("prsn_ntby_qty")) != 0 ||
-                            parseLong(output.get("frgn_ntby_qty")) != 0 ||
-                            parseLong(output.get("orgn_ntby_qty")) != 0) {
-                        validOutput = output;
-                        break;
-                    }
-                }
+            investors.add(new KisInvestorTrendDTO.InvestorInfo("외국인",
+                    parseLong(targetOutput.getForeignerNetBuyQty()),
+                    parseLong(targetOutput.getForeignerNetBuyAmount()) * 1_000_000));
 
-                // 종목명 fallback
-                if (stockName == null && validOutput.containsKey("hts_kor_isnm")) {
-                    stockName = String.valueOf(validOutput.get("hts_kor_isnm"));
-                }
-
-                investors.add(new KisInvestorTrendDTO.InvestorInfo(
-                        "개인",
-                        parseLong(validOutput.get("prsn_ntby_qty")),
-                        parseLong(validOutput.get("prsn_ntby_tr_pbmn")) * 1_000_000
-                ));
-
-                investors.add(new KisInvestorTrendDTO.InvestorInfo(
-                        "외국인",
-                        parseLong(validOutput.get("frgn_ntby_qty")),
-                        parseLong(validOutput.get("frgn_ntby_tr_pbmn")) * 1_000_000
-                ));
-
-                investors.add(new KisInvestorTrendDTO.InvestorInfo(
-                        "기관",
-                        parseLong(validOutput.get("orgn_ntby_qty")),
-                        parseLong(validOutput.get("orgn_ntby_tr_pbmn")) * 1_000_000
-                ));
-            }
+            investors.add(new KisInvestorTrendDTO.InvestorInfo("기관",
+                    parseLong(targetOutput.getInstitutionNetBuyQty()),
+                    parseLong(targetOutput.getInstitutionNetBuyAmount()) * 1_000_000));
 
             return KisInvestorTrendDTO.InvestorTrendResponse.builder()
                     .stockCode(stockCode)
                     .stockName(stockName)
+                    .closePrice(parseLong(targetOutput.getClosePrice()))
+                    .changeAmount(parseLong(targetOutput.getChangeAmount()))
+                    .changeSign(targetOutput.getChangeSign())
                     .investors(investors)
                     .build();
 
-        } catch (Exception e) {
-            throw new BusinessException(
-                    ErrorCode.KIS_API_ERROR,
-                    "KIS 투자자 동향 조회 실패: " + e.getMessage()
-            );
+        } catch (RestClientException e) {
+            throw new BusinessException(ErrorCode.KIS_API_ERROR, "KIS API 호출 실패: " + e.getMessage());
         }
     }
 
@@ -196,15 +165,10 @@ public class KisInvestorTrendService {
     private String decodeBase64(String encoded) {
         if (encoded == null || encoded.isEmpty()) return null;
         try {
-            return new String(
-                    Base64.getDecoder().decode(encoded),
-                    StandardCharsets.UTF_8
-            );
+            return new String(Base64.getDecoder().decode(encoded), StandardCharsets.UTF_8);
         } catch (Exception e) {
-            throw new BusinessException(
-                    ErrorCode.INTERNAL_SERVER_ERROR,
-                    "인증 정보 디코딩 실패"
-            );
+            log.error("Base64 디코딩 실패: {}", encoded, e);
+            throw new BusinessException(ErrorCode.INTERNAL_SERVER_ERROR, "잘못된 형식의 인증 정보입니다.");
         }
     }
 }
