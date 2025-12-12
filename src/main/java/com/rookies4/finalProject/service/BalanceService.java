@@ -74,10 +74,12 @@ public class BalanceService {
 
         if (output2 != null && !output2.isEmpty()) {
             KisBalanceDTO.OutputSummary s = output2.get(0);
+            summary.setTotalCashAmount(toBigDecimal(s.getDncaTotAmt()));            // 예수금총금액
+            summary.setD1CashAmount(toBigDecimal(s.getNxdyExccAmt()));              // D+1 예수금
+            summary.setD2CashAmount(toBigDecimal(s.getPrvsRcdlExccAmt()));          // D+2 예수금
             summary.setTotalEvaluationAmount(toBigDecimal(s.getTotEvluAmt()));      // 총평가금액
             summary.setTotalProfitLossAmount(toBigDecimal(s.getEvluPflsSmtlAmt())); // 평가손익합계금액
             summary.setTotalPurchaseAmount(toBigDecimal(s.getPchsAmtSmtlAmt()));    // 매입금액합계금액
-            summary.setCashAmount(toBigDecimal(s.getDncaTotAmt()));                 // 예수금총금액
             summary.setNetAssetAmount(toBigDecimal(s.getNassAmt()));                // 순자산금액
             summary.setProfitRate(toBigDecimal(s.getAsstIcdcErngRt()));             // 자산증감수익율
         }
