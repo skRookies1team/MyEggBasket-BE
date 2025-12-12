@@ -14,6 +14,8 @@ import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
+import java.util.List;
+
 @RestController
 @RequestMapping("/api/app/kis/investor-trend")
 @RequiredArgsConstructor
@@ -37,4 +39,19 @@ public class KisInvestorTrendController {
 
         return ResponseEntity.ok(response);
     }
+
+    @GetMapping("/market")
+    public ResponseEntity<List<KisInvestorTrendDTO.InvestorTrendResponse>>
+    getMarketInvestorTrend() {
+
+        Long userId = SecurityUtil.getCurrentUserId();
+        if (userId == null) {
+            throw new BusinessException(ErrorCode.AUTH_ACCESS_DENIED);
+        }
+
+        return ResponseEntity.ok(
+                kisInvestorTrendService.getMarketInvestorTrend(userId)
+        );
+    }
+
 }
