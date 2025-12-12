@@ -20,6 +20,9 @@ public class KisInvestorTrendDTO {
     public static class InvestorTrendResponse {
         private String stockCode;
         private String stockName;
+        private Long closePrice;      // 주식 종가
+        private Long changeAmount;    // 전일 대비
+        private String changeSign;    // 전일 대비 부호
         private List<InvestorInfo> investors;
     }
 
@@ -54,6 +57,16 @@ public class KisInvestorTrendDTO {
     @NoArgsConstructor
     @AllArgsConstructor
     public static class KisOutput {
+        // 추가된 필드 3개
+        @JsonProperty("stck_clpr")
+        private String closePrice;
+        
+        @JsonProperty("prdy_vrss")
+        private String changeAmount;
+        
+        @JsonProperty("prdy_vrss_sign")
+        private String changeSign;
+
         // 개인 순매수 수량 & 거래대금
         @JsonProperty("prsn_ntby_qty")
         private String personalNetBuyQty;
@@ -72,7 +85,7 @@ public class KisInvestorTrendDTO {
         @JsonProperty("orgn_ntby_tr_pbmn")
         private String institutionNetBuyAmount;
         
-        // 종목명 (API 문서에는 없지만 혹시 모르니 유지, 없으면 null)
+        // 종목명
         @JsonProperty("hts_kor_isnm")
         private String stockName;
     }
