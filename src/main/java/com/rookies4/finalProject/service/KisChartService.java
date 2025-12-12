@@ -21,6 +21,9 @@ import java.nio.charset.StandardCharsets;
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
 import java.util.Base64;
+import java.util.Collections;
+import java.util.List;
+import java.util.Map;
 import java.util.stream.Collectors;
 
 @Slf4j
@@ -32,6 +35,7 @@ public class KisChartService {
     private final RestTemplate restTemplate;
     private final UserRepository userRepository;
     private final KisAuthService kisAuthService;
+    private final ObjectMapper objectMapper;
 
     public KisChartDTO.ChartResponse getChartData(String stockCode, String period, Long userId) {
         // 1. 사용자 조회
@@ -57,33 +61,53 @@ public class KisChartService {
                 .queryParam("FID_INPUT_DATE_1", startDate)
                 .queryParam("FID_INPUT_DATE_2", endDate)
                 .queryParam("FID_PERIOD_DIV_CODE", periodCode)
-                .queryParam("FID_ORGN_ADJ_PRC", "0"); // 수정주가 반영
+                .queryParam("FID_ORG_ADJ_PRC", "1"); // 오타 수정: ORGN -> ORG
 
         HttpHeaders headers = new HttpHeaders();
         headers.set("authorization", "Bearer " + accessToken);
         headers.set("appkey", decodeBase64(user.getAppkey()));
         headers.set("appsecret", decodeBase64(user.getAppsecret()));
-        headers.set("tr_id", "FHKST03010100"); // 일/주/월/년 시세
+        // TR_ID를 다시 올바른 값으로 복원
+        headers.set("tr_id", "FHKST03010100"); 
         headers.setContentType(MediaType.APPLICATION_JSON);
 
         HttpEntity<Void> requestEntity = new HttpEntity<>(headers);
 
         try {
-            ResponseEntity<KisChartDTO.KisApiResponse> response = restTemplate.exchange(
+            ResponseEntity<Map> response = restTemplate.exchange(
                     builder.toUriString(),
                     HttpMethod.GET,
                     requestEntity,
-                    KisChartDTO.KisApiResponse.class
+                    Map.class
             );
 
-            KisChartDTO.KisApiResponse body = response.getBody();
-            if (body == null || !"0".equals(body.getRtCd()) || body.getOutput2() == null) {
-                String msg = body != null ? body.getMsg1() : "응답이 없습니다.";
+            Map<String, Object> body = response.getBody();
+            
+            try {
+                log.info("KIS Chart API Response: {}", objectMapper.writeValueAsString(body));
+            } catch (Exception e) {
+                log.error("Failed to log API response", e);
+            }
+
+            if (body == null || body.get("rt_cd") == null || ((String)body.get("rt_cd")).isEmpty()) {
+                 throw new BusinessException(ErrorCode.KIS_API_ERROR, "KIS API로부터 유효하지 않은 응답을 받았습니다.");
+            }
+
+            if (!"0".equals(body.get("rt_cd"))) {
+                String msg = (String) body.get("msg1");
                 throw new BusinessException(ErrorCode.KIS_API_ERROR, "차트 데이터 조회 실패: " + msg);
             }
 
-            // 5. 프론트엔드 응답 형식으로 변환
-            List<KisChartDTO.ChartData> chartData = body.getOutput2().stream()
+            List<Map<String, Object>> output2 = (List<Map<String, Object>>) body.get("output2");
+            if (output2 == null) {
+                return KisChartDTO.ChartResponse.builder()
+                        .stockCode(stockCode)
+                        .period(period)
+                        .data(Collections.emptyList())
+                        .build();
+            }
+
+            List<KisChartDTO.ChartData> chartData = output2.stream()
                     .map(this::transformToChartData)
                     .collect(Collectors.toList());
 
@@ -98,11 +122,11 @@ public class KisChartService {
         }
     }
 
-    private KisChartDTO.ChartData transformToChartData(KisChartDTO.KisOutput2 output) {
+    private KisChartDTO.ChartData transformToChartData(Map<String, Object> output) {
         return KisChartDTO.ChartData.builder()
-                .time(formatApiDate(output.getDate()))
-                .price(parseLong(output.getClosePrice()))
-                .volume(parseLong(output.getVolume()))
+                .time(formatApiDate((String) output.get("stck_bsop_date")))
+                .price(parseLong(output.get("stck_clpr")))
+                .volume(parseLong(output.get("acml_vol")))
                 .build();
     }
 
@@ -141,9 +165,11 @@ public class KisChartService {
         return dateStr.substring(0, 4) + "-" + dateStr.substring(4, 6) + "-" + dateStr.substring(6, 8);
     }
 
-    private Long parseLong(String value) {
-        if (value == null || value.trim().isEmpty()) return 0L;
-        return Long.parseLong(value.replaceAll(",", ""));
+    private Long parseLong(Object value) {
+        if (value == null) return 0L;
+        String strValue = String.valueOf(value).trim();
+        if (strValue.isEmpty()) return 0L;
+        return Long.parseLong(strValue.replaceAll(",", ""));
     }
 
     private String decodeBase64(String encoded) {
