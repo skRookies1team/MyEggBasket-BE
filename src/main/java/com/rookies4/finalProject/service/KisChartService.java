@@ -1,5 +1,6 @@
 package com.rookies4.finalProject.service;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.rookies4.finalProject.config.KisApiConfig;
 import com.rookies4.finalProject.domain.entity.User;
 import com.rookies4.finalProject.dto.KisAuthTokenDTO;
