@@ -6,6 +6,20 @@ import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
+/**
+ * KIS 지수 조회 API 응답 DTO
+ * 
+ * <p>이 DTO는 국내 지수와 해외 지수 조회 API의 공통 응답 구조를 처리합니다.
+ * 
+ * <p>사용 API:
+ * <ul>
+ *   <li>국내 지수: /uapi/domestic-stock/v1/quotations/inquire-index-price (tr_id: FHPUP01700000)</li>
+ *   <li>해외 지수: /uapi/overseas-price/v1/quotations/price (tr_id: HHDFS00000300)</li>
+ * </ul>
+ * 
+ * <p>IndexOutput은 국내 지수 필드와 해외 지수 필드를 모두 포함하여
+ * 각 API가 반환하는 필드에 유연하게 대응합니다.
+ */
 @Data
 public class KisIndexDTO {
 
