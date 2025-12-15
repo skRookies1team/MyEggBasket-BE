@@ -8,7 +8,7 @@ import lombok.NoArgsConstructor;
 
 import java.util.List;
 
-public class KisChartDTO {
+public class KisPeriodStockDTO {
 
     /**
      * 프론트엔드 응답용 DTO
