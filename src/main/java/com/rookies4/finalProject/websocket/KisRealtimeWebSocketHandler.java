@@ -36,23 +36,26 @@ public class KisRealtimeWebSocketHandler extends TextWebSocketHandler {
     public void afterConnectionEstablished(WebSocketSession session) throws Exception {
 
         // 요청 헤더 설정
-        Map<String, Object> requestHeader = new HashMap<>();
-        requestHeader.put("approval_key", approvalKey);
-        requestHeader.put("custtype", custType);
-        requestHeader.put("tr_type", "1"); // 1: 등록
-        requestHeader.put("content-type", "utf-8");
+        Map<String, Object> header = new HashMap<>();
+        header.put("approval_key", approvalKey);
+        header.put("custtype", custType);
+        header.put("tr_type", "1"); // 1: 등록
+        header.put("content-type", "utf-8");
 
         // 요청 바디 설정
-        Map<String, Object> requestBody = new HashMap<>();
-        requestBody.put("tr_id", "H0STCNT0");
-        requestBody.put("tr_key", stockCode);
+        Map<String, Object> input = new HashMap<>();
+        input.put("tr_id", "H0STCNT0");
+        input.put("tr_key", stockCode);
+
+        Map<String, Object> body = new HashMap<>();
+        body.put("input", input);
 
         // 요청 메시지 설정
-        Map<String, Object> requestMessage = new HashMap<>();
-        requestMessage.put("header", requestHeader);
-        requestMessage.put("body", requestBody);
+        Map<String, Object> msg = new HashMap<>();
+        msg.put("header", header);
+        msg.put("body", body);
 
-        String json = objectMapper.writeValueAsString(requestMessage);
+        String json = objectMapper.writeValueAsString(msg);
         log.info("[KIS] 구독 요청 전송: {}", json);
         session.sendMessage(new TextMessage(json)); // 요청 전송
     }
@@ -60,12 +63,13 @@ public class KisRealtimeWebSocketHandler extends TextWebSocketHandler {
     @Override
     protected void handleTextMessage(WebSocketSession session, TextMessage message) throws Exception {
 
-        String payload = message.getPayload();
+        String payload = message.getPayload().trim();
+        log.info("[KIS] 수신 원문: {}", payload);
 
         // PINGPONG 처리
         if (payload.contains("PINGPONG")) {
             log.debug("[KIS] PINGPONG 수신 -> 응답 전송");
-            session.sendMessage(new TextMessage("PINGPONG"));
+            session.sendMessage(new TextMessage(payload));
             return;
         }
 
@@ -95,22 +99,22 @@ public class KisRealtimeWebSocketHandler extends TextWebSocketHandler {
 
         // DTO로 매핑
         RealtimePriceDTO dto = RealtimePriceDTO.builder()
-                .stockCode(stockCode) // KIS 응답 말고 파라미터로 전달받은 종목코드 사용
-                .tickTime(f[1])                           // 체결 시간
-                .price(toDecimal(f[2]))                   // 현재가
-                .diff(toDecimal(f[4]))                    // 전일 대비
-                .diffRate(toDecimal(f[5]))                // 전일 대비율
-                .sellCount(toDecimal(f[15]))              // 매도 체결 건수
-                .buyCount(toDecimal(f[16]))               // 매수 체결 건수
-                .askPrice(toDecimal(f[10]))               // 매도호가1
-                .bidPrice(toDecimal(f[11]))               // 매수호가1
-                .totalAskQuantity(toDecimal(f[30]))       // 총 매도호가 잔량
-                .totalBidQuantity(toDecimal(f[31]))       // 총 매수호가 잔량
-                .openPrice(toDecimal(f[7]))               // 시가
-                .highPrice(toDecimal(f[8]))               // 고가
-                .lowPrice(toDecimal(f[9]))                // 저가
-                .volume(toDecimal(f[13]))                 // 누적 거래량
-                .tradingValue(toDecimal(f[14]))           // 누적 거래대금
+                .stockCode(stockCode)
+                .tickTime(f[1])
+                .price(toLong(f[2]))
+                .diff(toLong(f[4]))
+                .diffRate(toDouble(f[5]))
+                .sellCount(toLong(f[15]))
+                .buyCount(toLong(f[16]))
+                .askPrice(toLong(f[10]))
+                .bidPrice(toLong(f[11]))
+                .totalAskQuantity(toLong(f[30]))
+                .totalBidQuantity(toLong(f[31]))
+                .openPrice(toLong(f[7]))
+                .highPrice(toLong(f[8]))
+                .lowPrice(toLong(f[9]))
+                .volume(toLong(f[13]))
+                .tradingValue(toLong(f[14]))
                 .build();
 
         log.info("[{}] 현재가={} (전일대비={} / {}%)",
@@ -124,11 +128,19 @@ public class KisRealtimeWebSocketHandler extends TextWebSocketHandler {
         broadcaster.send(dto);
     }
 
-    private BigDecimal toDecimal(String v) {
+    private long toLong(String v) {
         try {
-            return new BigDecimal(v.trim());
+            return Long.parseLong(v.trim());
         } catch (Exception e) {
-            return BigDecimal.ZERO;
+            return 0L;
+        }
+    }
+
+    private double toDouble(String v) {
+        try {
+            return Double.parseDouble(v.trim());
+        } catch (Exception e) {
+            return 0.0;
         }
     }
 }
