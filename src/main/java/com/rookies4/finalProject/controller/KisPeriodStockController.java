@@ -16,7 +16,7 @@ import org.springframework.web.bind.annotation.*;
 @RequestMapping("/api/app/kis/chart")
 @RequiredArgsConstructor
 @Tag(name = "KIS 기간별 시세", description = "한국투자증권 일/주/월/년 시세 조회 API")
-public class KisPeridStockController {
+public class KisPeriodStockController {
 
     private final KisPeriodStockService kisPeriodStockService;
 

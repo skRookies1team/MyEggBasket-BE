@@ -62,14 +62,13 @@ public class KisPeriodStockService {
                 .queryParam("FID_INPUT_DATE_1", startDate)
                 .queryParam("FID_INPUT_DATE_2", endDate)
                 .queryParam("FID_PERIOD_DIV_CODE", periodCode)
-                .queryParam("FID_ORG_ADJ_PRC", "1"); // 오타 수정: ORGN -> ORG
+                .queryParam("FID_ORG_ADJ_PRC", "1");
 
         HttpHeaders headers = new HttpHeaders();
         headers.set("authorization", "Bearer " + accessToken);
         headers.set("appkey", decodeBase64(user.getAppkey()));
         headers.set("appsecret", decodeBase64(user.getAppsecret()));
-        // TR_ID를 다시 올바른 값으로 복원
-        headers.set("tr_id", "FHKST03010100"); 
+        headers.set("tr_id", "FHKST03010100");
         headers.setContentType(MediaType.APPLICATION_JSON);
 
         HttpEntity<Void> requestEntity = new HttpEntity<>(headers);
