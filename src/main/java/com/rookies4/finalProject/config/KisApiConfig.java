@@ -20,10 +20,26 @@ public class KisApiConfig {
     // 모의투자 서버 Base URL
 	private static final String VIRTUAL_BASE_URL = "https://openapivts.koreainvestment.com:29443";
 
+    /**
+     * 토큰 발급 URL을 반환합니다.
+     */
+    public static String tokenUrl(boolean useVirtualServer) {
+        final String base = useVirtualServer ? VIRTUAL_BASE_URL : BASE_URL;
+        return base + "/oauth2/tokenP";
+    }
+
+    /**
+     * 웹소켓 접속키 발급 URL을 반환합니다.
+     */
+    public static String approvalUrl(boolean useVirtualServer) {
+        final String base = useVirtualServer ? VIRTUAL_BASE_URL : BASE_URL;
+        return base + "/oauth2/Approval";
+    }
+
 	/**
 	 * API 엔드포인트 URI를 생성합니다.
 	 * @param useVirtualServer 모의투자 서버 사용 여부
-	 * @param path API 경로 (예: /oauth2/tokenP, /uapi/domestic-stock/v1/trading/order-cash 등)
+	 * @param path API 경로 (예: /uapi/domestic-stock/v1/trading/order-cash 등)
 	 * @return 완성된 URI
 	 */
     public static URI uri(boolean useVirtualServer, String path) {
@@ -62,4 +78,3 @@ public class KisApiConfig {
             return new String(decodedBytes, StandardCharsets.UTF_8);
     }
 }
-

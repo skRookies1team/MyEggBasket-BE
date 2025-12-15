@@ -32,11 +32,21 @@ public class KisAuthToken {
     private String tokenType;
 
     @Column(name = "expires_in")
-    private Long expiresIn;
+    private int expiresIn; // Long -> int
 
     @Column(name = "approval_key", length = 500)
     private String approvalKey;
 
-    @Column(name = "access_token_token_expired", length = 50)
-    private String accessTokenTokenExpired;
+    @Column(name = "access_token_token_expired")
+    private LocalDateTime accessTokenTokenExpired; // String -> LocalDateTime
+
+    /**
+     * 토큰 정보를 업데이트하는 메소드
+     */
+    public void updateToken(String accessToken, String tokenType, int expiresIn) {
+        this.accessToken = accessToken;
+        this.tokenType = tokenType;
+        this.expiresIn = expiresIn;
+        this.accessTokenTokenExpired = LocalDateTime.now().plusSeconds(expiresIn);
+    }
 }

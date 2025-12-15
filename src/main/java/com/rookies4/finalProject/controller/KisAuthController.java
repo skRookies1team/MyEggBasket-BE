@@ -49,7 +49,7 @@ public class KisAuthController {
 	}
 
     @PostMapping("/approval-key")
-    public ResponseEntity<KisAuthTokenDTO.KisApprovalKeyResponse> issueApprovalKey() {
+    public ResponseEntity<String> issueApprovalKey() {
         boolean useVirtualServer = false;
 
         // 현재 로그인한 사용자 확인
