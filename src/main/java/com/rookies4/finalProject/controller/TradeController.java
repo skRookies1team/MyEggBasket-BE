@@ -32,7 +32,7 @@ public class TradeController {
 
     // 1. 매수/매도 주문
     @PostMapping
-    public ResponseEntity<KisStockOrderDTO.KisStockOrderResponse> orderStock(
+    public ResponseEntity<KisStockOrderDTO.OrderResponse> orderStock( // KisStockOrderResponse -> OrderResponse
             @RequestParam(name = "virtual", defaultValue = "false") boolean useVirtualServer,
             @RequestBody KisStockOrderDTO.KisStockOrderRequest orderRequest){
 

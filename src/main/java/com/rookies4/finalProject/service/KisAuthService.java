@@ -7,6 +7,7 @@ import com.rookies4.finalProject.dto.KisAuthTokenDTO;
 import com.rookies4.finalProject.exception.BusinessException;
 import com.rookies4.finalProject.exception.ErrorCode;
 import com.rookies4.finalProject.repository.KisAuthRepository;
+import com.rookies4.finalProject.util.Base64Util; // 유틸리티 임포트
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpEntity;
@@ -69,8 +70,8 @@ public class KisAuthService {
     private KisAuthTokenDTO.KisTokenRequest buildTokenRequest(User user) {
         return KisAuthTokenDTO.KisTokenRequest.builder()
                 .grant_type("client_credentials")
-                .appkey(KisApiConfig.decodeBase64(user.getAppkey())) // KisApiConfig 사용
-                .appsecret(KisApiConfig.decodeBase64(user.getAppsecret())) // KisApiConfig 사용
+                .appkey(Base64Util.decode(user.getAppkey())) // 유틸리티 사용
+                .appsecret(Base64Util.decode(user.getAppsecret())) // 유틸리티 사용
                 .build();
     }
 
@@ -93,8 +94,8 @@ public class KisAuthService {
         
         Map<String, String> requestBody = Map.of(
             "grant_type", "client_credentials",
-            "appkey", KisApiConfig.decodeBase64(user.getAppkey()), // KisApiConfig 사용
-            "appsecret", KisApiConfig.decodeBase64(user.getAppsecret())
+            "appkey", Base64Util.decode(user.getAppkey()), // 유틸리티 사용
+            "appsecret", Base64Util.decode(user.getAppsecret())
         );
 
         HttpEntity<Map<String, String>> requestEntity = new HttpEntity<>(requestBody, headers);

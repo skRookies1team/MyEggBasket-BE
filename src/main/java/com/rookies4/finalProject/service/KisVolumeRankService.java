@@ -8,6 +8,7 @@ import com.rookies4.finalProject.dto.VolumeRankResponseDTO;
 import com.rookies4.finalProject.exception.BusinessException;
 import com.rookies4.finalProject.exception.ErrorCode;
 import com.rookies4.finalProject.repository.KisAuthRepository;
+import com.rookies4.finalProject.util.Base64Util; // 유틸리티 임포트
 import lombok.RequiredArgsConstructor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -49,8 +50,8 @@ public class KisVolumeRankService {
                         "인증 토큰이 존재하지 않습니다. 먼저 토큰을 발급받아주세요."
                 ));
 
-        String decodedAppkey = KisApiConfig.decodeBase64(user.getAppkey());
-        String decodedAppsecret = KisApiConfig.decodeBase64(user.getAppsecret());
+        String decodedAppkey = Base64Util.decode(user.getAppkey()); // 유틸리티 사용
+        String decodedAppsecret = Base64Util.decode(user.getAppsecret()); // 유틸리티 사용
         String tradeId = "FHPST01710000"; // 거래량 순위 조회 TR_ID
 
         // Request Header 설정

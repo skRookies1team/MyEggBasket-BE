@@ -4,8 +4,6 @@ import org.springframework.context.annotation.Configuration;
 import org.springframework.web.util.UriComponentsBuilder;
 
 import java.net.URI;
-import java.nio.charset.StandardCharsets;
-import java.util.Base64;
 import java.util.Map;
 
 /**
@@ -59,22 +57,7 @@ public class KisApiConfig {
         }
 
         // 3. URI 빌드 및 반환
-        // .build(true)는 템플릿 변수를 확장하지 않고 인코딩하는 방식입니다.
         return builder.build(true)
                 .toUri();
-    }
-
-    /**
-     * Base64로 인코딩된 문자열을 디코딩합니다.
-     * @param encoded 인코딩된 문자열
-     * @return 디코딩된 문자열
-     */
-
-    public static String decodeBase64(String encoded) {
-        if (encoded == null || encoded.isEmpty()) {
-            return encoded;
-        }
-            byte[] decodedBytes = Base64.getDecoder().decode(encoded);
-            return new String(decodedBytes, StandardCharsets.UTF_8);
     }
 }
