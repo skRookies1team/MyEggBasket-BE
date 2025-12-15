@@ -5,6 +5,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.rookies4.finalProject.config.KisApiConfig;
 import com.rookies4.finalProject.domain.entity.User;
 import com.rookies4.finalProject.dto.KisTransactionDTO;
+import com.rookies4.finalProject.util.Base64Util;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -19,10 +20,8 @@ import org.springframework.web.client.RestClientResponseException;
 import org.springframework.web.client.RestTemplate;
 
 import java.net.URI;
-import java.nio.charset.StandardCharsets;
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
-import java.util.Base64;
 
 @Slf4j
 @Service
@@ -46,8 +45,8 @@ public class KisTransactionService {
         headers.setContentType(MediaType.APPLICATION_JSON);
         headers.setAccept(List.of(MediaType.APPLICATION_JSON));
         headers.set("authorization", "Bearer " + accessToken);
-        headers.set("appkey", decodeBase64(user.getAppkey()));
-        headers.set("appsecret", decodeBase64(user.getAppsecret()));
+        headers.set("appkey", Base64Util.decode(user.getAppkey()));
+        headers.set("appsecret", Base64Util.decode(user.getAppsecret()));
 
         // TR_ID 설정 (실전: TTTC8001R, 모의: VTTC8001R)
         if (useVirtual) {
@@ -130,15 +129,4 @@ public class KisTransactionService {
         }
     }
 
-    private String decodeBase64(String encoded) {
-        if (encoded == null || encoded.isEmpty()) {
-            return "";
-        }
-        try {
-            return new String(Base64.getDecoder().decode(encoded), StandardCharsets.UTF_8);
-        } catch (Exception e) {
-            log.warn("Base64 디코딩 실패, 원본 값 사용: {}", e.getMessage());
-            return encoded;
-        }
-    }
 }
