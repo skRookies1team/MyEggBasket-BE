@@ -80,6 +80,17 @@ public class UserService {
                 .orElseThrow(() -> new BusinessException(ErrorCode.USER_NOT_FOUND, "해당 이메일의 사용자를 찾을 수 없습니다."));
     }
 
+    /**
+     * ID를 기반으로 User 엔티티를 조회합니다.
+     * @param userId 조회할 사용자 ID
+     * @return User 엔티티 (Optional 처리)
+     */
+    @Transactional(readOnly = true)
+    public User getUserById(Long userId) {
+        return userRepository.findById(userId)
+                .orElseThrow(() -> new BusinessException(ErrorCode.USER_NOT_FOUND, "해당 ID의 사용자를 찾을 수 없습니다."));
+    }
+
     // --- 3. Update User (사용자 정보 수정) ---
     /**
      * 사용자의 이름, AppKey, AppSecret, FCM Token 등의 정보를 수정합니다. (비밀번호/이메일 제외)
