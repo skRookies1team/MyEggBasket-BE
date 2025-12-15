@@ -4,7 +4,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.rookies4.finalProject.config.KisApiConfig;
 import com.rookies4.finalProject.domain.entity.User;
 import com.rookies4.finalProject.dto.KisAuthTokenDTO;
-import com.rookies4.finalProject.dto.KisChartDTO;
+import com.rookies4.finalProject.dto.KisPeriodStockDTO;
 import com.rookies4.finalProject.exception.BusinessException;
 import com.rookies4.finalProject.exception.ErrorCode;
 import com.rookies4.finalProject.repository.UserRepository;
@@ -31,14 +31,14 @@ import java.util.stream.Collectors;
 @Service
 @RequiredArgsConstructor
 @Transactional(readOnly = true)
-public class KisChartService {
+public class KisPeriodStockService {
 
     private final RestTemplate restTemplate;
     private final UserRepository userRepository;
     private final KisAuthService kisAuthService;
     private final ObjectMapper objectMapper;
 
-    public KisChartDTO.ChartResponse getChartData(String stockCode, String period, Long userId) {
+    public KisPeriodStockDTO.ChartResponse getChartData(String stockCode, String period, Long userId) {
         // 1. 사용자 조회
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new BusinessException(ErrorCode.USER_NOT_FOUND));
@@ -101,18 +101,18 @@ public class KisChartService {
 
             List<Map<String, Object>> output2 = (List<Map<String, Object>>) body.get("output2");
             if (output2 == null) {
-                return KisChartDTO.ChartResponse.builder()
+                return KisPeriodStockDTO.ChartResponse.builder()
                         .stockCode(stockCode)
                         .period(period)
                         .data(Collections.emptyList())
                         .build();
             }
 
-            List<KisChartDTO.ChartData> chartData = output2.stream()
+            List<KisPeriodStockDTO.ChartData> chartData = output2.stream()
                     .map(this::transformToChartData)
                     .collect(Collectors.toList());
 
-            return KisChartDTO.ChartResponse.builder()
+            return KisPeriodStockDTO.ChartResponse.builder()
                     .stockCode(stockCode)
                     .period(period)
                     .data(chartData)
@@ -123,8 +123,8 @@ public class KisChartService {
         }
     }
 
-    private KisChartDTO.ChartData transformToChartData(Map<String, Object> output) {
-        return KisChartDTO.ChartData.builder()
+    private KisPeriodStockDTO.ChartData transformToChartData(Map<String, Object> output) {
+        return KisPeriodStockDTO.ChartData.builder()
                 .time(formatApiDate((String) output.get("stck_bsop_date")))
                 .price(parseLong(output.get("stck_clpr")))
                 .volume(parseLong(output.get("acml_vol")))
