@@ -29,7 +29,9 @@ public class KisPeriodStockDTO {
     @AllArgsConstructor
     public static class ChartData {
         private String time;   // 날짜 (YYYY-MM-DD)
-        private Long price;    // 종가
+        private Long price;    // 종가 (Close Price)
+        private Long open;     // 시가 (Open Price)
+        private Long high;     // 고가 (High Price)
         private Long volume;   // 거래량
     }
 
@@ -70,6 +72,15 @@ public class KisPeriodStockDTO {
 
         @JsonProperty("stck_clpr")
         private String closePrice; // 종가
+
+        @JsonProperty("stck_oprc")
+        private String openPrice; // 시가
+
+        @JsonProperty("stck_hgpr")
+        private String highPrice; // 고가
+
+        @JsonProperty("stck_lwpr")
+        private String lowPrice; // 저가
 
         @JsonProperty("acml_vol")
         private String volume; // 누적 거래량

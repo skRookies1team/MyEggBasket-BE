@@ -74,32 +74,18 @@ public class KisPeriodStockService {
         HttpEntity<Void> requestEntity = new HttpEntity<>(headers);
 
         try {
-            ResponseEntity<Map> response = restTemplate.exchange(
+            ResponseEntity<KisPeriodStockDTO.KisApiResponse> response = restTemplate.exchange(
                     builder.toUriString(),
                     HttpMethod.GET,
                     requestEntity,
-                    Map.class
+                    KisPeriodStockDTO.KisApiResponse.class
             );
 
-            Map<String, Object> body = response.getBody();
-            
-            try {
-                log.info("KIS Chart API Response: {}", objectMapper.writeValueAsString(body));
-            } catch (Exception e) {
-                log.error("Failed to log API response", e);
-            }
+            KisPeriodStockDTO.KisApiResponse body = response.getBody();
 
-            if (body == null || body.get("rt_cd") == null || ((String)body.get("rt_cd")).isEmpty()) {
-                 throw new BusinessException(ErrorCode.KIS_API_ERROR, "KIS API로부터 유효하지 않은 응답을 받았습니다.");
-            }
-
-            if (!"0".equals(body.get("rt_cd"))) {
-                String msg = (String) body.get("msg1");
-                throw new BusinessException(ErrorCode.KIS_API_ERROR, "차트 데이터 조회 실패: " + msg);
-            }
-
-            List<Map<String, Object>> output2 = (List<Map<String, Object>>) body.get("output2");
-            if (output2 == null) {
+            if (body == null || !"0".equals(body.getRtCd()) || body.getOutput2() == null) {
+                String msg = body != null ? body.getMsg1() : "응답이 없습니다.";
+                log.warn("KIS Chart API Error: {}", msg);
                 return KisPeriodStockDTO.ChartResponse.builder()
                         .stockCode(stockCode)
                         .period(period)
@@ -107,7 +93,7 @@ public class KisPeriodStockService {
                         .build();
             }
 
-            List<KisPeriodStockDTO.ChartData> chartData = output2.stream()
+            List<KisPeriodStockDTO.ChartData> chartData = body.getOutput2().stream()
                     .map(this::transformToChartData)
                     .collect(Collectors.toList());
 
@@ -122,11 +108,14 @@ public class KisPeriodStockService {
         }
     }
 
-    private KisPeriodStockDTO.ChartData transformToChartData(Map<String, Object> output) {
+    private KisPeriodStockDTO.ChartData transformToChartData(KisPeriodStockDTO.KisOutput2 output) {
         return KisPeriodStockDTO.ChartData.builder()
-                .time(formatApiDate((String) output.get("stck_bsop_date")))
-                .price(parseLong(output.get("stck_clpr")))
-                .volume(parseLong(output.get("acml_vol")))
+                .time(formatApiDate(output.getDate()))
+                .price(parseLong(output.getClosePrice()))
+                .open(parseLong(output.getOpenPrice()))
+                .high(parseLong(output.getHighPrice()))
+                .low(parseLong(output.getLowPrice()))
+                .volume(parseLong(output.getVolume()))
                 .build();
     }
 
@@ -165,11 +154,9 @@ public class KisPeriodStockService {
         return dateStr.substring(0, 4) + "-" + dateStr.substring(4, 6) + "-" + dateStr.substring(6, 8);
     }
 
-    private Long parseLong(Object value) {
-        if (value == null) return 0L;
-        String strValue = String.valueOf(value).trim();
-        if (strValue.isEmpty()) return 0L;
-        return Long.parseLong(strValue.replaceAll(",", ""));
+    private Long parseLong(String value) {
+        if (value == null || value.trim().isEmpty()) return 0L;
+        return Long.parseLong(value.replaceAll(",", ""));
     }
 
     private String decodeBase64(String encoded) {
