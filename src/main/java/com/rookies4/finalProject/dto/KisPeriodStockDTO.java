@@ -32,6 +32,7 @@ public class KisPeriodStockDTO {
         private Long price;    // 종가 (Close Price)
         private Long open;     // 시가 (Open Price)
         private Long high;     // 고가 (High Price)
+        private Long low;      // 저가 (Low Price)
         private Long volume;   // 거래량
     }
 
