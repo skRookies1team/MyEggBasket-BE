@@ -1,7 +1,6 @@
 package com.rookies4.finalProject.service;
 
 import com.rookies4.finalProject.domain.entity.User;
-import com.rookies4.finalProject.dto.KisAuthTokenDTO;
 import com.rookies4.finalProject.exception.BusinessException;
 import com.rookies4.finalProject.exception.ErrorCode;
 import com.rookies4.finalProject.security.SecurityUtil;
@@ -38,10 +37,8 @@ public class RealtimeService {
         // 현재 사용자 Entity 받아오기
         User currentUser = userService.getUserById(currentUserId);
 
-        // approval key 발급
-        KisAuthTokenDTO.KisApprovalKeyResponse approvalKeyResponse =
-                kisAuthService.issueApprovalKey(useVirtualServer, currentUser);
-        String approvalKey = approvalKeyResponse.getApprovalKey();
+        // approval key 발급 (String으로 직접 받음)
+        String approvalKey = kisAuthService.issueApprovalKey(useVirtualServer, currentUser);
         String wsUrl = useVirtualServer ? VIRTUAL_WS_URL : REAL_WS_URL;
 
         // WebSocket 연결

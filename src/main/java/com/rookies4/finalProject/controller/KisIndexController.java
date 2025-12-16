@@ -1,12 +1,9 @@
 package com.rookies4.finalProject.controller;
 
-
-import com.rookies4.finalProject.domain.entity.User;
 import com.rookies4.finalProject.dto.KisForeignIndexDTO;
 import com.rookies4.finalProject.dto.KisKoreaIndexDTO;
 import com.rookies4.finalProject.exception.BusinessException;
 import com.rookies4.finalProject.exception.ErrorCode;
-import com.rookies4.finalProject.repository.UserRepository;
 import com.rookies4.finalProject.security.SecurityUtil;
 import com.rookies4.finalProject.service.KisForeignIndexService;
 import com.rookies4.finalProject.service.KisKoreaIndexService;
@@ -21,38 +18,28 @@ public class KisIndexController {
 
     private final KisForeignIndexService kisForeignIndexService;
     private final KisKoreaIndexService kisKoreaIndexService;
-    private final UserRepository userRepository;
 
     @GetMapping("/oversea")
     public ResponseEntity<KisForeignIndexDTO.KisForeignIndexResponse> showForeignIndex(
-            @RequestParam KisForeignIndexDTO.KisForeignIndexRequest indexCode){
+            @RequestParam String indexCode){
 
         Long currentUserId = SecurityUtil.getCurrentUserId();
         if (currentUserId == null) {
             throw new BusinessException(ErrorCode.AUTH_ACCESS_DENIED, "로그인이 필요합니다.");
         }
 
-        // 사용자 조회
-        User user = userRepository.findById(currentUserId)
-                .orElseThrow(() -> new BusinessException(ErrorCode.USER_NOT_FOUND,
-                        "로그인한 사용자를 찾을 수 없습니다."));
-        return ResponseEntity.ok(kisForeignIndexService.showForeignIndex(user, indexCode));
+        return ResponseEntity.ok(kisForeignIndexService.getForeignIndex(indexCode, currentUserId));
     }
 
     @GetMapping("/domestic")
     public ResponseEntity<KisKoreaIndexDTO.KisKoreaIndexResponse> showKoreaIndex(
-            @RequestParam KisKoreaIndexDTO.KisKoreaIndexRequest indexCode){
+            @RequestParam String indexCode){
 
         Long currentUserId = SecurityUtil.getCurrentUserId();
         if (currentUserId == null) {
             throw new BusinessException(ErrorCode.AUTH_ACCESS_DENIED, "로그인이 필요합니다.");
         }
 
-        // 사용자 조회
-        User user = userRepository.findById(currentUserId)
-                .orElseThrow(() -> new BusinessException(ErrorCode.USER_NOT_FOUND,
-                        "로그인한 사용자를 찾을 수 없습니다."));
-        return ResponseEntity.ok(kisKoreaIndexService.showKoreaIndex(user, indexCode));
+        return ResponseEntity.ok(kisKoreaIndexService.getKoreaIndex(indexCode, currentUserId));
     }
 }
-

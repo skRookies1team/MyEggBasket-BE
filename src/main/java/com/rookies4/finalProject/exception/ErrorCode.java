@@ -17,6 +17,7 @@ public enum ErrorCode {
     AUTH_ACCESS_DENIED("AUTH_004", "접근 권한이 없습니다", HttpStatus.FORBIDDEN),
     AUTH_ACCOUNT_LOCKED("AUTH_005", "계정이 잠겨있습니다", HttpStatus.FORBIDDEN),
     AUTH_INVALID_PASSWORD("AUTH_006", "비밀번호가 올바르지 않습니다", HttpStatus.UNAUTHORIZED),
+    AUTH_TOKEN_NOT_FOUND("AUTH_007", "인증 토큰을 찾을 수 없습니다", HttpStatus.NOT_FOUND), // 추가
 
     // ----------------------------------------------------
     // 검증 관련 (40X)

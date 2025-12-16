@@ -10,6 +10,7 @@ import com.rookies4.finalProject.exception.BusinessException;
 import com.rookies4.finalProject.exception.ErrorCode;
 import com.rookies4.finalProject.repository.StockRepository;
 import com.rookies4.finalProject.repository.UserRepository;
+import com.rookies4.finalProject.util.Base64Util; // 유틸리티 임포트
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.*;
@@ -20,10 +21,8 @@ import org.springframework.web.client.RestTemplate;
 import org.springframework.web.util.UriComponentsBuilder;
 
 import java.net.URI;
-import java.nio.charset.StandardCharsets;
 import java.time.LocalTime;
 import java.util.ArrayList;
-import java.util.Base64;
 import java.util.List;
 import java.util.Objects;
 
@@ -40,15 +39,11 @@ public class KisInvestorTrendService {
     private final ObjectMapper objectMapper;
 
     public KisInvestorTrendDTO.InvestorTrendResponse getInvestorTrend(String stockCode, Long userId) {
-        // 1. 사용자 조회
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new BusinessException(ErrorCode.USER_NOT_FOUND));
-
-        // 2. 토큰 발급 (실전투자 계좌로만 가능)
         KisAuthTokenDTO.KisTokenResponse tokenResponse = kisAuthService.issueToken(false, user);
         String accessToken = tokenResponse.getAccessToken();
 
-        // 3. KIS API 호출
         String path = "/uapi/domestic-stock/v1/quotations/inquire-investor";
         URI uri = KisApiConfig.uri(false, path);
 
@@ -58,9 +53,9 @@ public class KisInvestorTrendService {
 
         HttpHeaders headers = new HttpHeaders();
         headers.set("authorization", "Bearer " + accessToken);
-        headers.set("appkey", decodeBase64(user.getAppkey()));
-        headers.set("appsecret", decodeBase64(user.getAppsecret()));
-        headers.set("tr_id", "FHKST01010900"); // 투자자별 매매동향
+        headers.set("appkey", Base64Util.decode(user.getAppkey())); // 유틸리티 사용
+        headers.set("appsecret", Base64Util.decode(user.getAppsecret())); // 유틸리티 사용
+        headers.set("tr_id", "FHKST01010900");
         headers.setContentType(MediaType.APPLICATION_JSON);
 
         HttpEntity<Void> requestEntity = new HttpEntity<>(headers);
@@ -79,20 +74,18 @@ public class KisInvestorTrendService {
                 throw new BusinessException(ErrorCode.KIS_API_ERROR, "투자자 동향 조회 실패: " + msg);
             }
 
-            // 4. 시간대별로 사용할 데이터 선택
             List<KisInvestorTrendDTO.KisOutput> outputList = body.getOutput();
             KisInvestorTrendDTO.KisOutput targetOutput;
 
             LocalTime now = LocalTime.now();
-            LocalTime marketCloseTime = LocalTime.of(16, 0); // 오후 4시
+            LocalTime marketCloseTime = LocalTime.of(16, 0);
 
             if (now.isBefore(marketCloseTime) && outputList.size() > 1) {
-                targetOutput = outputList.get(1); // 전일 데이터
+                targetOutput = outputList.get(1);
             } else {
-                targetOutput = outputList.get(0); // 당일 데이터
+                targetOutput = outputList.get(0);
             }
 
-            // 5. 데이터 가공
             String stockName = stockRepository.findById(stockCode)
                     .map(Stock::getName)
                     .orElse(targetOutput.getStockName());
@@ -125,14 +118,8 @@ public class KisInvestorTrendService {
         }
     }
 
-    /**
-     * ==================================
-     * 2️ 주요 종목(시장) 투자자 동향 조회
-     * ==================================
-     */
     public List<KisInvestorTrendDTO.InvestorTrendResponse>
     getMarketInvestorTrend(Long userId) {
-
         List<String> tickers = List.of(
                 "005930", "000660", "207940", "005380", "000270",
                 "055550", "105560", "068270", "015760", "028260",
@@ -160,15 +147,5 @@ public class KisInvestorTrendService {
         String str = String.valueOf(value).replaceAll(",", "").trim();
         if (str.isEmpty()) return 0L;
         return Long.parseLong(str);
-    }
-
-    private String decodeBase64(String encoded) {
-        if (encoded == null || encoded.isEmpty()) return null;
-        try {
-            return new String(Base64.getDecoder().decode(encoded), StandardCharsets.UTF_8);
-        } catch (Exception e) {
-            log.error("Base64 디코딩 실패: {}", encoded, e);
-            throw new BusinessException(ErrorCode.INTERNAL_SERVER_ERROR, "잘못된 형식의 인증 정보입니다.");
-        }
     }
 }

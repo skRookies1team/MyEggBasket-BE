@@ -5,9 +5,8 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.rookies4.finalProject.config.KisApiConfig;
 import com.rookies4.finalProject.domain.entity.User;
 import com.rookies4.finalProject.dto.KisBalanceDTO;
+import com.rookies4.finalProject.util.Base64Util;
 import java.net.URI;
-import java.nio.charset.StandardCharsets;
-import java.util.Base64;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -45,8 +44,8 @@ public class KisBalanceService {
         headers.setAccept(List.of(MediaType.APPLICATION_JSON)); // 응답 형식 JSON
 
         headers.set("authorization", "Bearer " + accessToken); // KIS가 요구하는 accessToken
-        headers.set("appkey", decodeBase64(user.getAppkey())); // 암호화된 appkey 디코딩해서 삽입
-        headers.set("appsecret", decodeBase64(user.getAppsecret())); // 암호화된 appsecret 디코딩해서 삽입
+        headers.set("appkey", Base64Util.decode(user.getAppkey())); // 암호화된 appkey 디코딩해서 삽입
+        headers.set("appsecret", Base64Util.decode(user.getAppsecret())); // 암호화된 appsecret 디코딩해서 삽입
 
         // TR_ID 설정 (실전: TTTC8434R, 모의: VTTC8434R)
         if (useVirtual) {
@@ -122,18 +121,6 @@ public class KisBalanceService {
         } catch (Exception e) {
             log.error("[KIS] 응답 파싱 실패: {}, userId = {}", e.getMessage(), user.getId(), e);
             return new KisBalanceDTO();
-        }
-    }
-
-    private String decodeBase64(String encoded) {
-        if (encoded == null || encoded.isEmpty()) {
-            return "";
-        }
-        try {
-            return new String(Base64.getDecoder().decode(encoded), StandardCharsets.UTF_8);
-        } catch (Exception e) {
-            log.warn("Base64 디코딩 실패, 원본 값 사용: {}", e.getMessage());
-            return encoded;
         }
     }
 }

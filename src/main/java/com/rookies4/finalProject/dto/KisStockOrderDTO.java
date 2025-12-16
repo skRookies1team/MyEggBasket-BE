@@ -14,7 +14,7 @@ public class KisStockOrderDTO {
     @NoArgsConstructor
     @AllArgsConstructor
     @Builder
-    public static class KisStockOrderResponse {
+    public static class OrderResponse { // 클래스 이름 변경
         // API 응답의 "rt_cd" (0: 성공, 그 외: 실패)
         @JsonProperty("rt_cd")
         private String rtCd;
