@@ -1,5 +1,6 @@
 package com.rookies4.finalProject.service;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.rookies4.finalProject.config.KisApiConfig;
 import com.rookies4.finalProject.domain.entity.KisAuthToken;
 import com.rookies4.finalProject.domain.entity.User;
@@ -8,7 +9,7 @@ import com.rookies4.finalProject.dto.VolumeRankResponseDTO;
 import com.rookies4.finalProject.exception.BusinessException;
 import com.rookies4.finalProject.exception.ErrorCode;
 import com.rookies4.finalProject.repository.KisAuthRepository;
-import com.rookies4.finalProject.util.Base64Util; // 유틸리티 임포트
+import com.rookies4.finalProject.util.EncryptionUtil;
 import lombok.RequiredArgsConstructor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -33,6 +34,7 @@ public class KisVolumeRankService {
 
     private final RestTemplate restTemplate;
     private final KisAuthRepository kisAuthRepository;
+    private final ObjectMapper objectMapper; // JSON 로깅용
 
     /**
      * 거래량 순위 TOP 10 조회 후 프론트엔드용 DTO로 변환하여 반환
@@ -50,8 +52,8 @@ public class KisVolumeRankService {
                         "인증 토큰이 존재하지 않습니다. 먼저 토큰을 발급받아주세요."
                 ));
 
-        String decodedAppkey = Base64Util.decode(user.getAppkey()); // 유틸리티 사용
-        String decodedAppsecret = Base64Util.decode(user.getAppsecret()); // 유틸리티 사용
+        String decodedAppkey = EncryptionUtil.decrypt(user.getAppkey());
+        String decodedAppsecret = EncryptionUtil.decrypt(user.getAppsecret());
         String tradeId = "FHPST01710000"; // 거래량 순위 조회 TR_ID
 
         // Request Header 설정
@@ -94,6 +96,13 @@ public class KisVolumeRankService {
                     );
 
             KisVolumeRankDTO.KisVolumeRankResponse body = response.getBody();
+            
+            // [디버깅] API 응답 로그 출력
+            try {
+                log.info("KIS Volume Rank API Response: {}", objectMapper.writeValueAsString(body));
+            } catch (Exception e) {
+                log.error("Failed to log API response", e);
+            }
 
             if (body == null || body.getOutput() == null) {
                 throw new BusinessException(

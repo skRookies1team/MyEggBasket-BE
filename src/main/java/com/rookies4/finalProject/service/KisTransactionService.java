@@ -5,7 +5,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.rookies4.finalProject.config.KisApiConfig;
 import com.rookies4.finalProject.domain.entity.User;
 import com.rookies4.finalProject.dto.KisTransactionDTO;
-import com.rookies4.finalProject.util.Base64Util;
+import com.rookies4.finalProject.util.EncryptionUtil;
 import java.net.URI;
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
@@ -44,8 +44,8 @@ public class KisTransactionService {
         headers.setContentType(MediaType.APPLICATION_JSON);
         headers.setAccept(List.of(MediaType.APPLICATION_JSON));
         headers.set("authorization", "Bearer " + accessToken);
-        headers.set("appkey", Base64Util.decode(user.getAppkey()));
-        headers.set("appsecret", Base64Util.decode(user.getAppsecret()));
+        headers.set("appkey", EncryptionUtil.decrypt(user.getAppkey()));
+        headers.set("appsecret", EncryptionUtil.decrypt(user.getAppsecret()));
 
         // TR_ID 설정 (실전: TTTC8001R, 모의: VTTC8001R)
         if (useVirtual) {

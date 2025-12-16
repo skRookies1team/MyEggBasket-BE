@@ -40,14 +40,12 @@ public class User {
     @Column(name = "password", nullable = false, length = 255)
     private String password;
 
-    // appkey(VARCHAR(255))에 매핑 - 증권사 API Key (암호화 필수)
-    // 증권사 API Key
-    @Column(name = "appkey", length = 255)
+    // appkey(VARCHAR(500))에 매핑 - 증권사 API Key (암호화 필수)
+    @Column(name = "appkey", length = 500)
     private String appkey;
 
-    // appsecret(VARCHAR(255))에 매핑 - 증권사 API Secret (암호화 필수)
-    // 증권사 API Secret
-    @Column(name = "appsecret", length = 255)
+    // appsecret(VARCHAR(500))에 매핑 - 증권사 API Secret (암호화 필수)
+    @Column(name = "appsecret", length = 500)
     private String appsecret;
 
     @Column(name="account", length = 8)

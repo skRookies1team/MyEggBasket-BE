@@ -7,13 +7,14 @@ import com.rookies4.finalProject.dto.KisAuthTokenDTO;
 import com.rookies4.finalProject.exception.BusinessException;
 import com.rookies4.finalProject.exception.ErrorCode;
 import com.rookies4.finalProject.repository.KisAuthRepository;
-import com.rookies4.finalProject.util.Base64Util; // 유틸리티 임포트
+import com.rookies4.finalProject.util.EncryptionUtil;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpEntity;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.client.RestClientException;
 import org.springframework.web.client.RestTemplate;
@@ -29,7 +30,7 @@ public class KisAuthService {
     private final RestTemplate restTemplate;
     private final KisAuthRepository kisAuthRepository;
 
-    @Transactional
+    @Transactional(propagation = Propagation.REQUIRES_NEW) // 트랜잭션 전파 설정 추가
     public KisAuthTokenDTO.KisTokenResponse issueToken(boolean useVirtualServer, User user) {
         return kisAuthRepository.findByUser(user)
                 .filter(token -> !isTokenExpired(token))
@@ -46,7 +47,7 @@ public class KisAuthService {
                 });
     }
 
-    @Transactional
+    @Transactional(propagation = Propagation.REQUIRES_NEW) // 트랜잭션 전파 설정 추가
     public String issueApprovalKey(boolean useVirtualServer, User user) {
         KisAuthToken token = kisAuthRepository.findByUser(user)
                 .orElseThrow(() -> new BusinessException(ErrorCode.AUTH_TOKEN_NOT_FOUND, "인증 토큰 정보가 없습니다."));
@@ -70,8 +71,8 @@ public class KisAuthService {
     private KisAuthTokenDTO.KisTokenRequest buildTokenRequest(User user) {
         return KisAuthTokenDTO.KisTokenRequest.builder()
                 .grant_type("client_credentials")
-                .appkey(Base64Util.decode(user.getAppkey())) // 유틸리티 사용
-                .appsecret(Base64Util.decode(user.getAppsecret())) // 유틸리티 사용
+                .appkey(EncryptionUtil.decrypt(user.getAppkey()))
+                .appsecret(EncryptionUtil.decrypt(user.getAppsecret()))
                 .build();
     }
 
@@ -94,8 +95,8 @@ public class KisAuthService {
         
         Map<String, String> requestBody = Map.of(
             "grant_type", "client_credentials",
-            "appkey", Base64Util.decode(user.getAppkey()), // 유틸리티 사용
-            "appsecret", Base64Util.decode(user.getAppsecret())
+            "appkey", EncryptionUtil.decrypt(user.getAppkey()),
+            "appsecret", EncryptionUtil.decrypt(user.getAppsecret())
         );
 
         HttpEntity<Map<String, String>> requestEntity = new HttpEntity<>(requestBody, headers);

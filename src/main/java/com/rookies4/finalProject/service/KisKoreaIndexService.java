@@ -7,7 +7,7 @@ import com.rookies4.finalProject.dto.KisKoreaIndexDTO;
 import com.rookies4.finalProject.exception.BusinessException;
 import com.rookies4.finalProject.exception.ErrorCode;
 import com.rookies4.finalProject.repository.UserRepository;
-import com.rookies4.finalProject.util.Base64Util;
+import com.rookies4.finalProject.util.EncryptionUtil;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpEntity;
@@ -43,13 +43,13 @@ public class KisKoreaIndexService {
         URI uri = KisApiConfig.uri(false, path);
 
         UriComponentsBuilder builder = UriComponentsBuilder.fromUri(uri)
-                .queryParam("FID_COND_MRKT_DIV_CODE", "U")
+                .queryParam("FID_COND_MRKT_DIV_CODE", "J")  // J: 주요지수 (코스피, 코스닥 등)
                 .queryParam("FID_INPUT_ISCD", indexCode);
 
         HttpHeaders headers = new HttpHeaders();
         headers.set("authorization", "Bearer " + accessToken);
-        headers.set("appkey", Base64Util.decode(user.getAppkey())); // 유틸리티 사용
-        headers.set("appsecret", Base64Util.decode(user.getAppsecret())); // 유틸리티 사용
+        headers.set("appkey", EncryptionUtil.decrypt(user.getAppkey()));
+        headers.set("appsecret", EncryptionUtil.decrypt(user.getAppsecret()));
         headers.set("tr_id", "FHPUP01700000");
         headers.setContentType(MediaType.APPLICATION_JSON);
 
