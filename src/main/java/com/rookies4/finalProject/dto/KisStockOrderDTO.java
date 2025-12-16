@@ -1,6 +1,8 @@
 package com.rookies4.finalProject.dto;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
+import com.rookies4.finalProject.domain.enums.TransactionType;
+import com.rookies4.finalProject.domain.enums.TriggerSource;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
@@ -53,9 +55,10 @@ public class KisStockOrderDTO {
     @AllArgsConstructor
     @Builder
     public static class KisStockOrderRequest {
-        private String orderId;       // "매수" 또는 "매도"
-        private String stockCode;     // 종목코드
-        private String orderQuantity; // 주문수량
-//        private String orderPrice;    // 주문단가 (지정가)
+        private String stockCode;              // 종목코드
+        private TransactionType orderType;     // BUY / SELL
+        private Integer quantity;              // 주문수량
+        private Integer price;                 // 주문단가
+        private TriggerSource triggerSource;   // MANUAL / AI
     }
 }
