@@ -1,6 +1,7 @@
 package com.rookies4.finalProject.controller;
 
-import com.rookies4.finalProject.dto.KisIndexDTO;
+import com.rookies4.finalProject.dto.KisForeignIndexDTO;
+import com.rookies4.finalProject.dto.KisKoreaIndexDTO;
 import com.rookies4.finalProject.exception.BusinessException;
 import com.rookies4.finalProject.exception.ErrorCode;
 import com.rookies4.finalProject.security.SecurityUtil;
@@ -19,7 +20,7 @@ public class KisIndexController {
     private final KisKoreaIndexService kisKoreaIndexService;
 
     @GetMapping("/oversea")
-    public ResponseEntity<KisIndexDTO.IndexResponse> showForeignIndex(
+    public ResponseEntity<KisForeignIndexDTO.KisForeignIndexResponse> showForeignIndex(
             @RequestParam String indexCode){
 
         Long currentUserId = SecurityUtil.getCurrentUserId();
@@ -31,7 +32,7 @@ public class KisIndexController {
     }
 
     @GetMapping("/domestic")
-    public ResponseEntity<KisIndexDTO.IndexResponse> showKoreaIndex(
+    public ResponseEntity<KisKoreaIndexDTO.KisKoreaIndexResponse> showKoreaIndex(
             @RequestParam String indexCode){
 
         Long currentUserId = SecurityUtil.getCurrentUserId();

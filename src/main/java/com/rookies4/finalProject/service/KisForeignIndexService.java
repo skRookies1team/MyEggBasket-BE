@@ -3,7 +3,7 @@ package com.rookies4.finalProject.service;
 import com.rookies4.finalProject.config.KisApiConfig;
 import com.rookies4.finalProject.domain.entity.User;
 import com.rookies4.finalProject.dto.KisAuthTokenDTO;
-import com.rookies4.finalProject.dto.KisIndexDTO;
+import com.rookies4.finalProject.dto.KisForeignIndexDTO;
 import com.rookies4.finalProject.exception.BusinessException;
 import com.rookies4.finalProject.exception.ErrorCode;
 import com.rookies4.finalProject.repository.UserRepository;
@@ -33,7 +33,7 @@ public class KisForeignIndexService {
     private final UserRepository userRepository;
     private final KisAuthService kisAuthService;
 
-    public KisIndexDTO.IndexResponse getForeignIndex(String indexCode, Long userId) {
+    public KisForeignIndexDTO.KisForeignIndexResponse getForeignIndex(String indexCode, Long userId) {
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new BusinessException(ErrorCode.USER_NOT_FOUND));
         KisAuthTokenDTO.KisTokenResponse tokenResponse = kisAuthService.issueToken(false, user);
@@ -57,11 +57,11 @@ public class KisForeignIndexService {
         HttpEntity<Void> requestEntity = new HttpEntity<>(headers);
 
         try {
-            ResponseEntity<KisIndexDTO.IndexResponse> response = restTemplate.exchange(
+            ResponseEntity<KisForeignIndexDTO.KisForeignIndexResponse> response = restTemplate.exchange(
                     builder.toUriString(),
                     HttpMethod.GET,
                     requestEntity,
-                    KisIndexDTO.IndexResponse.class
+                    KisForeignIndexDTO.KisForeignIndexResponse.class
             );
 
             if (response.getBody() == null || !"0".equals(response.getBody().getRtCd())) {
