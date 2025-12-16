@@ -1,8 +1,10 @@
 package com.rookies4.finalProject.service;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.rookies4.finalProject.config.KisApiConfig;
 import com.rookies4.finalProject.domain.entity.User;
-import com.rookies4.finalProject.dto.KisAuthTokenDTO;
+import com.rookies4.finalProject.domain.enums.TransactionType;
 import com.rookies4.finalProject.dto.KisStockOrderDTO;
 import com.rookies4.finalProject.exception.BusinessException;
 import com.rookies4.finalProject.exception.ErrorCode;
@@ -10,9 +12,7 @@ import com.rookies4.finalProject.repository.UserRepository;
 import com.rookies4.finalProject.util.Base64Util;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.http.HttpEntity;
-import org.springframework.http.HttpHeaders;
-import org.springframework.http.MediaType;
+import org.springframework.http.*;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.client.RestClientException;
@@ -27,69 +27,113 @@ import java.util.Map;
 public class KisStockOrderService {
 
     private final RestTemplate restTemplate;
-    private final UserRepository userRepository;
-    private final KisAuthService kisAuthService;
+    private final KisAuthRepository kisAuthRepository;
+    private final ObjectMapper objectMapper;
 
-    @Transactional
-    public KisStockOrderDTO.OrderResponse orderStock(boolean useVirtualServer, User user, KisStockOrderDTO.KisStockOrderRequest orderRequest) {
-        
-        KisAuthTokenDTO.KisTokenResponse tokenResponse = kisAuthService.issueToken(useVirtualServer, user);
-        String accessToken = tokenResponse.getAccessToken();
+    /**
+     * KIS 주문 (매수 / 매도)
+     */
+    public KisStockOrderDTO.KisStockOrderResponse orderStock(
+            boolean useVirtualServer,
+            User user,
+            KisStockOrderDTO.KisStockOrderRequest request
+    ) {
+        if (user == null) {
+            throw new BusinessException(ErrorCode.USER_NOT_FOUND, "사용자 정보가 없습니다.");
+        }
 
-        String path = useVirtualServer ? "/uapi/virtual-stock/v1/trading/order-cash" : "/uapi/real-stock/v1/trading/order-cash"; // 실전/모의 경로 분기
-        URI uri = KisApiConfig.uri(useVirtualServer, path);
+        // ===== 1. 요청값 검증 (🔥 중요) =====
+        Integer qty = request.getQuantity();
+        Integer price = request.getPrice();
 
-        // orderRequest에서 필요한 값 추출
-        String stockCode = orderRequest.getStockCode();
-        String orderType = orderRequest.getOrderId(); // "매수", "매도"
-        int quantity = Integer.parseInt(orderRequest.getOrderQuantity());
-        int price = 0; // 시장가 주문을 위해 0으로 설정 (필요시 orderRequest에서 받아오도록 수정)
+        if (qty == null || qty <= 0) {
+            throw new BusinessException(ErrorCode.VALIDATION_ERROR, "주문 수량이 올바르지 않습니다.");
+        }
+        if (price == null || price <= 0) {
+            throw new BusinessException(ErrorCode.VALIDATION_ERROR, "주문 가격이 올바르지 않습니다.");
+        }
 
-        // 주문 요청 바디 생성
-        Map<String, String> requestBody = Map.of(
-                "CANO", user.getAccount(),
-                "ACNT_PRDT_CD", "01",
-                "PDNO", stockCode,
-                "ORD_DVSN", getOrderDivision(orderType, price),
-                "ORD_QTY", String.valueOf(quantity),
-                "ORD_UNPR", String.valueOf(price)
-        );
+        // ===== 2. trade_id 결정 =====
+        String tradeId = resolveTradeId(useVirtualServer, request.getOrderType());
 
+        // ===== 3. KIS URL =====
+        URI uri = KisApiConfig.uri(useVirtualServer,
+                "/uapi/domestic-stock/v1/trading/order-cash");
+
+        // ===== 4. 인증 토큰 =====
+        KisAuthToken token = kisAuthRepository.findByUser(user)
+                .orElseThrow(() ->
+                        new BusinessException(ErrorCode.BUSINESS_RULE_VIOLATION, "KIS 인증 토큰이 없습니다.")
+                );
+
+        // ===== 5. Headers =====
         HttpHeaders headers = new HttpHeaders();
         headers.setContentType(MediaType.APPLICATION_JSON);
-        headers.set("authorization", "Bearer " + accessToken);
-        headers.set("appkey", Base64Util.decode(user.getAppkey()));
-        headers.set("appsecret", Base64Util.decode(user.getAppsecret()));
-        headers.set("tr_id", useVirtualServer ? "VTTC0802U" : "TTTC0802U"); // 모의투자/실전투자 TR_ID 분기
+        headers.set("authorization", token.getTokenType() + " " + token.getAccessToken());
+        headers.set("appkey", KisApiConfig.decodeBase64(user.getAppkey()));
+        headers.set("appsecret", KisApiConfig.decodeBase64(user.getAppsecret()));
+        headers.set("tr_id", tradeId);
+        headers.set("custtype", "P");
 
-        HttpEntity<Map<String, String>> requestEntity = new HttpEntity<>(requestBody, headers);
+        // ===== 6. Body (🔥 핵심 수정) =====
+        Map<String, String> body = new HashMap<>();
+        body.put("CANO", user.getAccount());
+        body.put("ACNT_PRDT_CD", "01");
+        body.put("PDNO", request.getStockCode());
+        body.put("ORD_DVSN", "03");
+        body.put("ORD_QTY", String.valueOf(qty));
+        body.put("ORD_UNPR", "0");
 
+        String bodyJson;
         try {
-            KisStockOrderDTO.OrderResponse response = restTemplate.postForObject(
-                    uri,
-                    requestEntity,
-                    KisStockOrderDTO.OrderResponse.class
+            bodyJson = objectMapper.writeValueAsString(body);
+        } catch (JsonProcessingException e) {
+            throw new BusinessException(ErrorCode.INTERNAL_SERVER_ERROR, "주문 JSON 생성 실패");
+        }
+
+        HttpEntity<String> entity = new HttpEntity<>(bodyJson, headers);
+
+        // ===== 7. 요청 로그 =====
+        log.info("### KIS 주문 요청 ({} ) ###", useVirtualServer ? "모의" : "실전");
+        log.info("URL: {}", uri);
+        log.info("tr_id: {}", tradeId);
+        log.info("Request Body: {}", bodyJson);
+
+        // ===== 8. 호출 =====
+        try {
+            ResponseEntity<KisStockOrderDTO.KisStockOrderResponse> response =
+                    restTemplate.exchange(
+                            uri,
+                            HttpMethod.POST,
+                            entity,
+                            KisStockOrderDTO.KisStockOrderResponse.class
+                    );
+
+            log.info("KIS 주문 응답: {}", response.getBody());
+            return response.getBody();
+
+        } catch (RestClientResponseException e) {
+            log.error("KIS 주문 실패 [{}]: {}", e.getStatusCode(), e.getResponseBodyAsString());
+            throw new BusinessException(
+                    ErrorCode.KIS_API_ERROR,
+                    "KIS 주문 실패: " + e.getResponseBodyAsString()
             );
-
-            if (response == null || !"0".equals(response.getRtCd())) {
-                String msg = response != null ? response.getMsg1() : "응답이 없습니다.";
-                throw new BusinessException(ErrorCode.KIS_API_ERROR, "주문 실패: " + msg);
-            }
-
-            return response;
-
         } catch (RestClientException e) {
-            log.error("KIS 주문 API 호출 실패", e);
-            throw new BusinessException(ErrorCode.KIS_API_ERROR, "주문 API 호출에 실패했습니다.");
+            log.error("KIS API 통신 오류", e);
+            throw new BusinessException(
+                    ErrorCode.KIS_API_ERROR,
+                    "KIS API 통신 중 오류가 발생했습니다."
+            );
         }
     }
 
-    private String getOrderDivision(String orderType, int price) {
-        // "매수", "매도" 등의 orderType에 따라 KIS API가 요구하는 코드로 변환하는 로직 추가 필요
-        // 현재는 가격에 따라서만 지정가/시장가 구분
-        if (price == 0) {
-            return "01"; // 시장가
+    /**
+     * 매수 / 매도에 따른 trade_id 선택
+     */
+    private String resolveTradeId(boolean virtual, TransactionType type) {
+        if (virtual) {
+            return type == TransactionType.BUY ? "VTTC0802U" : "VTTC0801U";
         }
-        return "00"; // 지정가
+        return type == TransactionType.BUY ? "TTTC0802U" : "TTTC0801U";
     }
 }
