@@ -5,7 +5,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.rookies4.finalProject.config.KisApiConfig;
 import com.rookies4.finalProject.domain.entity.User;
 import com.rookies4.finalProject.dto.KisBalanceDTO;
-import com.rookies4.finalProject.util.Base64Util;
+import com.rookies4.finalProject.util.EncryptionUtil;
 import java.net.URI;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
@@ -44,8 +44,8 @@ public class KisBalanceService {
         headers.setAccept(List.of(MediaType.APPLICATION_JSON)); // 응답 형식 JSON
 
         headers.set("authorization", "Bearer " + accessToken); // KIS가 요구하는 accessToken
-        headers.set("appkey", Base64Util.decode(user.getAppkey())); // 암호화된 appkey 디코딩해서 삽입
-        headers.set("appsecret", Base64Util.decode(user.getAppsecret())); // 암호화된 appsecret 디코딩해서 삽입
+        headers.set("appkey", EncryptionUtil.decrypt(user.getAppkey())); // 암호화된 appkey 복호화해서 삽입
+        headers.set("appsecret", EncryptionUtil.decrypt(user.getAppsecret())); // 암호화된 appsecret 복호화해서 삽입
 
         // TR_ID 설정 (실전: TTTC8434R, 모의: VTTC8434R)
         if (useVirtual) {

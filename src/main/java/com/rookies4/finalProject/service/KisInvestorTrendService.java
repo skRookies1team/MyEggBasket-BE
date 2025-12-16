@@ -10,7 +10,7 @@ import com.rookies4.finalProject.exception.BusinessException;
 import com.rookies4.finalProject.exception.ErrorCode;
 import com.rookies4.finalProject.repository.StockRepository;
 import com.rookies4.finalProject.repository.UserRepository;
-import com.rookies4.finalProject.util.Base64Util; // 유틸리티 임포트
+import com.rookies4.finalProject.util.EncryptionUtil; // EncryptionUtil 임포트
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.*;
@@ -53,8 +53,8 @@ public class KisInvestorTrendService {
 
         HttpHeaders headers = new HttpHeaders();
         headers.set("authorization", "Bearer " + accessToken);
-        headers.set("appkey", Base64Util.decode(user.getAppkey())); // 유틸리티 사용
-        headers.set("appsecret", Base64Util.decode(user.getAppsecret())); // 유틸리티 사용
+        headers.set("appkey", EncryptionUtil.decrypt(user.getAppkey())); // 복호화 사용
+        headers.set("appsecret", EncryptionUtil.decrypt(user.getAppsecret())); // 복호화 사용
         headers.set("tr_id", "FHKST01010900");
         headers.setContentType(MediaType.APPLICATION_JSON);
 
