@@ -3,11 +3,13 @@ package com.rookies4.finalProject.service;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.rookies4.finalProject.config.KisApiConfig;
+import com.rookies4.finalProject.domain.entity.KisAuthToken;
 import com.rookies4.finalProject.domain.entity.User;
 import com.rookies4.finalProject.domain.enums.TransactionType;
 import com.rookies4.finalProject.dto.KisStockOrderDTO;
 import com.rookies4.finalProject.exception.BusinessException;
 import com.rookies4.finalProject.exception.ErrorCode;
+import com.rookies4.finalProject.repository.KisAuthRepository;
 import com.rookies4.finalProject.repository.UserRepository;
 import com.rookies4.finalProject.util.Base64Util;
 import lombok.RequiredArgsConstructor;
@@ -16,9 +18,11 @@ import org.springframework.http.*;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.client.RestClientException;
+import org.springframework.web.client.RestClientResponseException;
 import org.springframework.web.client.RestTemplate;
 
 import java.net.URI;
+import java.util.HashMap;
 import java.util.Map;
 
 @Slf4j
@@ -33,7 +37,7 @@ public class KisStockOrderService {
     /**
      * KIS 주문 (매수 / 매도)
      */
-    public KisStockOrderDTO.KisStockOrderResponse orderStock(
+    public KisStockOrderDTO.OrderResponse orderStock(
             boolean useVirtualServer,
             User user,
             KisStockOrderDTO.KisStockOrderRequest request
@@ -70,8 +74,8 @@ public class KisStockOrderService {
         HttpHeaders headers = new HttpHeaders();
         headers.setContentType(MediaType.APPLICATION_JSON);
         headers.set("authorization", token.getTokenType() + " " + token.getAccessToken());
-        headers.set("appkey", KisApiConfig.decodeBase64(user.getAppkey()));
-        headers.set("appsecret", KisApiConfig.decodeBase64(user.getAppsecret()));
+        headers.set("appkey", Base64Util.decode(user.getAppkey()));
+        headers.set("appsecret", Base64Util.decode(user.getAppsecret()));
         headers.set("tr_id", tradeId);
         headers.set("custtype", "P");
 
@@ -101,12 +105,12 @@ public class KisStockOrderService {
 
         // ===== 8. 호출 =====
         try {
-            ResponseEntity<KisStockOrderDTO.KisStockOrderResponse> response =
+            ResponseEntity<KisStockOrderDTO.OrderResponse> response =
                     restTemplate.exchange(
                             uri,
                             HttpMethod.POST,
                             entity,
-                            KisStockOrderDTO.KisStockOrderResponse.class
+                            KisStockOrderDTO.OrderResponse.class
                     );
 
             log.info("KIS 주문 응답: {}", response.getBody());
