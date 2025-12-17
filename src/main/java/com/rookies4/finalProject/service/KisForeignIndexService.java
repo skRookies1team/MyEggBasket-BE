@@ -1,14 +1,27 @@
 package com.rookies4.finalProject.service;
 
-import com.rookies4.finalProject.component.KisApiClient;
-import com.rookies4.finalProject.dto.KisApiRequest;
+import com.rookies4.finalProject.config.KisApiConfig;
+import com.rookies4.finalProject.domain.entity.User;
+import com.rookies4.finalProject.dto.KisAuthTokenDTO;
 import com.rookies4.finalProject.dto.KisForeignIndexDTO;
 import com.rookies4.finalProject.exception.BusinessException;
 import com.rookies4.finalProject.exception.ErrorCode;
+import com.rookies4.finalProject.repository.UserRepository;
+import com.rookies4.finalProject.util.EncryptionUtil;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.http.HttpEntity;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.HttpMethod;
+import org.springframework.http.MediaType;
+import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.client.RestClientException;
+import org.springframework.web.client.RestTemplate;
+import org.springframework.web.util.UriComponentsBuilder;
+
+import java.net.URI;
 
 @Slf4j
 @Service
@@ -16,27 +29,52 @@ import org.springframework.transaction.annotation.Transactional;
 @Transactional(readOnly = true)
 public class KisForeignIndexService {
 
-    private final KisApiClient kisApiClient;
+    private final RestTemplate restTemplate;
+    private final UserRepository userRepository;
+    private final KisAuthService kisAuthService;
+    private final EncryptionUtil encryptionUtil;
 
     public KisForeignIndexDTO.KisForeignIndexResponse getForeignIndex(String indexCode, Long userId) {
-        KisApiRequest request = KisApiRequest.builder()
-                .path("/uapi/overseas-price/v1/quotations/price")
-                .trId("HHDFS00000300")
-                .param("AUTH", "")
-                .param("EXCD", getExchangeCode(indexCode))
-                .param("SYMB", indexCode)
-                .useVirtualServer(false)
-                .build();
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new BusinessException(ErrorCode.USER_NOT_FOUND));
+        KisAuthTokenDTO.KisTokenResponse tokenResponse = kisAuthService.issueToken(false, user);
+        String accessToken = tokenResponse.getAccessToken();
 
-        KisForeignIndexDTO.KisForeignIndexResponse response = 
-            kisApiClient.get(userId, request, KisForeignIndexDTO.KisForeignIndexResponse.class);
+        String path = "/uapi/overseas-price/v1/quotations/price";
+        URI uri = KisApiConfig.uri(false, path);
 
-        if (response == null || !"0".equals(response.getRtCd())) {
-            String msg = response != null ? response.getMsg1() : "응답이 없습니다.";
-            throw new BusinessException(ErrorCode.KIS_API_ERROR, "해외 지수 조회 실패: " + msg);
+        UriComponentsBuilder builder = UriComponentsBuilder.fromUri(uri)
+                .queryParam("AUTH", "")
+                .queryParam("EXCD", getExchangeCode(indexCode))
+                .queryParam("SYMB", indexCode);
+
+        HttpHeaders headers = new HttpHeaders();
+        headers.set("authorization", "Bearer " + accessToken);
+        headers.set("appkey", encryptionUtil.decrypt(user.getAppkey()));
+        headers.set("appsecret", encryptionUtil.decrypt(user.getAppsecret()));
+        headers.set("tr_id", "HHDFS00000300");
+        headers.setContentType(MediaType.APPLICATION_JSON);
+
+        HttpEntity<Void> requestEntity = new HttpEntity<>(headers);
+
+        try {
+            ResponseEntity<KisForeignIndexDTO.KisForeignIndexResponse> response = restTemplate.exchange(
+                    builder.toUriString(),
+                    HttpMethod.GET,
+                    requestEntity,
+                    KisForeignIndexDTO.KisForeignIndexResponse.class
+            );
+
+            if (response.getBody() == null || !"0".equals(response.getBody().getRtCd())) {
+                String msg = response.getBody() != null ? response.getBody().getMsg1() : "응답이 없습니다.";
+                throw new BusinessException(ErrorCode.KIS_API_ERROR, "해외 지수 조회 실패: " + msg);
+            }
+
+            return response.getBody();
+
+        } catch (RestClientException e) {
+            throw new BusinessException(ErrorCode.KIS_API_ERROR, "KIS API 호출 실패: " + e.getMessage());
         }
-
-        return response;
     }
 
     private String getExchangeCode(String indexCode) {

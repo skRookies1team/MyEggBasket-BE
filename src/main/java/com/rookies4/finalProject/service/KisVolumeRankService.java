@@ -37,6 +37,7 @@ public class KisVolumeRankService {
     private final KisAuthRepository kisAuthRepository;
     private final ObjectMapper objectMapper; // JSON 로깅용
     private final SecureLogger secureLogger; // 민감 정보 마스킹용
+    private final EncryptionUtil encryptionUtil;
 
     /**
      * 거래량 순위 TOP 10 조회 후 프론트엔드용 DTO로 변환하여 반환
@@ -54,8 +55,8 @@ public class KisVolumeRankService {
                         "인증 토큰이 존재하지 않습니다. 먼저 토큰을 발급받아주세요."
                 ));
 
-        String decodedAppkey = EncryptionUtil.decrypt(user.getAppkey());
-        String decodedAppsecret = EncryptionUtil.decrypt(user.getAppsecret());
+        String decodedAppkey = encryptionUtil.decrypt(user.getAppkey());
+        String decodedAppsecret = encryptionUtil.decrypt(user.getAppsecret());
         String tradeId = "FHPST01710000"; // 거래량 순위 조회 TR_ID
 
         // Request Header 설정
