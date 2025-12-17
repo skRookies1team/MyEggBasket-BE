@@ -92,11 +92,14 @@ public class KisAuthService {
     private KisAuthTokenDTO.KisApprovalKeyResponse requestNewApprovalKey(boolean useVirtualServer, User user) {
         HttpHeaders headers = new HttpHeaders();
         headers.setContentType(MediaType.APPLICATION_JSON);
-        
+
+        String decryptedAppkey = EncryptionUtil.decrypt(user.getAppkey());
+        String decryptedAppsecret = EncryptionUtil.decrypt(user.getAppsecret());
+
         Map<String, String> requestBody = Map.of(
-            "grant_type", "client_credentials",
-            "appkey", EncryptionUtil.decrypt(user.getAppkey()),
-            "appsecret", EncryptionUtil.decrypt(user.getAppsecret())
+                "grant_type", "client_credentials",
+                "appkey", decryptedAppkey,
+                "secretkey", decryptedAppsecret  
         );
 
         HttpEntity<Map<String, String>> requestEntity = new HttpEntity<>(requestBody, headers);
