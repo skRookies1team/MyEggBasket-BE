@@ -32,6 +32,7 @@ public class KisForeignIndexService {
     private final RestTemplate restTemplate;
     private final UserRepository userRepository;
     private final KisAuthService kisAuthService;
+    private final EncryptionUtil encryptionUtil;
 
     public KisForeignIndexDTO.KisForeignIndexResponse getForeignIndex(String indexCode, Long userId) {
         User user = userRepository.findById(userId)
@@ -49,8 +50,8 @@ public class KisForeignIndexService {
 
         HttpHeaders headers = new HttpHeaders();
         headers.set("authorization", "Bearer " + accessToken);
-        headers.set("appkey", EncryptionUtil.decrypt(user.getAppkey()));
-        headers.set("appsecret", EncryptionUtil.decrypt(user.getAppsecret()));
+        headers.set("appkey", encryptionUtil.decrypt(user.getAppkey()));
+        headers.set("appsecret", encryptionUtil.decrypt(user.getAppsecret()));
         headers.set("tr_id", "HHDFS00000300");
         headers.setContentType(MediaType.APPLICATION_JSON);
 

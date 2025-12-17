@@ -33,6 +33,7 @@ public class KisTransactionService {
     private final RestTemplate restTemplate;
     private final ObjectMapper objectMapper; // 스프링 기본 ObjectMapper 주입
     private final SecureLogger secureLogger;
+    private final EncryptionUtil encryptionUtil;
 
     // 한국투자증권 [주식일별주문체결조회] API 호출
     public KisTransactionDTO getDailyOrderHistory(User user, String accessToken, boolean useVirtual) {
@@ -46,8 +47,8 @@ public class KisTransactionService {
         headers.setContentType(MediaType.APPLICATION_JSON);
         headers.setAccept(List.of(MediaType.APPLICATION_JSON));
         headers.set("authorization", "Bearer " + accessToken);
-        headers.set("appkey", EncryptionUtil.decrypt(user.getAppkey()));
-        headers.set("appsecret", EncryptionUtil.decrypt(user.getAppsecret()));
+        headers.set("appkey", encryptionUtil.decrypt(user.getAppkey()));
+        headers.set("appsecret", encryptionUtil.decrypt(user.getAppsecret()));
 
         // TR_ID 설정 (실전: TTTC8001R, 모의: VTTC8001R)
         if (useVirtual) {

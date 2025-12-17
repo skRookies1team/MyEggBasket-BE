@@ -38,6 +38,7 @@ public class KisPeriodStockService {
     private final KisAuthService kisAuthService;
     private final ObjectMapper objectMapper;
     private final SecureLogger secureLogger;
+    private final EncryptionUtil encryptionUtil;
 
     public KisPeriodStockDTO.ChartResponse getChartData(String stockCode, String period, Long userId) {
         User user = userRepository.findById(userId)
@@ -62,8 +63,8 @@ public class KisPeriodStockService {
 
         HttpHeaders headers = new HttpHeaders();
         headers.set("authorization", "Bearer " + accessToken);
-        headers.set("appkey", EncryptionUtil.decrypt(user.getAppkey())); // 복호화 사용
-        headers.set("appsecret", EncryptionUtil.decrypt(user.getAppsecret())); // 복호화 사용
+        headers.set("appkey", encryptionUtil.decrypt(user.getAppkey())); // 복호화 사용
+        headers.set("appsecret", encryptionUtil.decrypt(user.getAppsecret())); // 복호화 사용
         headers.set("tr_id", "FHKST03010100");
         headers.setContentType(MediaType.APPLICATION_JSON);
 

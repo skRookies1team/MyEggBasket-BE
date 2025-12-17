@@ -32,6 +32,7 @@ public class KisKoreaIndexService {
     private final RestTemplate restTemplate;
     private final UserRepository userRepository;
     private final KisAuthService kisAuthService;
+    private final EncryptionUtil encryptionUtil;
 
     public KisKoreaIndexDTO.KisKoreaIndexResponse getKoreaIndex(String indexCode, Long userId) {
         User user = userRepository.findById(userId)
@@ -48,8 +49,8 @@ public class KisKoreaIndexService {
 
         HttpHeaders headers = new HttpHeaders();
         headers.set("authorization", "Bearer " + accessToken);
-        headers.set("appkey", EncryptionUtil.decrypt(user.getAppkey()));
-        headers.set("appsecret", EncryptionUtil.decrypt(user.getAppsecret()));
+        headers.set("appkey", encryptionUtil.decrypt(user.getAppkey()));
+        headers.set("appsecret", encryptionUtil.decrypt(user.getAppsecret()));
         headers.set("tr_id", "FHPUP01700000");
         headers.setContentType(MediaType.APPLICATION_JSON);
 

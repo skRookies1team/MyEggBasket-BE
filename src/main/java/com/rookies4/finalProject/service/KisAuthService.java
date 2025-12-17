@@ -29,6 +29,7 @@ public class KisAuthService {
 
     private final RestTemplate restTemplate;
     private final KisAuthRepository kisAuthRepository;
+    private final EncryptionUtil encryptionUtil;
 
     @Transactional(propagation = Propagation.REQUIRES_NEW) // 트랜잭션 전파 설정 추가
     public KisAuthTokenDTO.KisTokenResponse issueToken(boolean useVirtualServer, User user) {
@@ -71,8 +72,8 @@ public class KisAuthService {
     private KisAuthTokenDTO.KisTokenRequest buildTokenRequest(User user) {
         return KisAuthTokenDTO.KisTokenRequest.builder()
                 .grant_type("client_credentials")
-                .appkey(EncryptionUtil.decrypt(user.getAppkey()))
-                .appsecret(EncryptionUtil.decrypt(user.getAppsecret()))
+                .appkey(encryptionUtil.decrypt(user.getAppkey()))
+                .appsecret(encryptionUtil.decrypt(user.getAppsecret()))
                 .build();
     }
 
@@ -93,8 +94,8 @@ public class KisAuthService {
         HttpHeaders headers = new HttpHeaders();
         headers.setContentType(MediaType.APPLICATION_JSON);
 
-        String decryptedAppkey = EncryptionUtil.decrypt(user.getAppkey());
-        String decryptedAppsecret = EncryptionUtil.decrypt(user.getAppsecret());
+        String decryptedAppkey = encryptionUtil.decrypt(user.getAppkey());
+        String decryptedAppsecret = encryptionUtil.decrypt(user.getAppsecret());
 
         Map<String, String> requestBody = Map.of(
                 "grant_type", "client_credentials",
