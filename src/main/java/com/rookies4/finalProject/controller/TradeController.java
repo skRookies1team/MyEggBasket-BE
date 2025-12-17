@@ -14,8 +14,6 @@ import com.rookies4.finalProject.service.KisStockOrderService;
 import com.rookies4.finalProject.service.TransactionService;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
@@ -23,8 +21,6 @@ import org.springframework.web.bind.annotation.*;
 @RequestMapping("/api/app/kis/trade")
 @RequiredArgsConstructor
 public class TradeController {
-
-    private static final Logger log = LoggerFactory.getLogger(TradeController.class);
 
     private final KisStockOrderService kisStockOrderService;
     private final TransactionService transactionService;
@@ -38,11 +34,7 @@ public class TradeController {
             @RequestParam(name = "virtual", defaultValue = "false") boolean useVirtualServer,
             @RequestBody KisStockOrderDTO.KisStockOrderRequest orderRequest){
 
-        log.info("### KIS 주문 요청 (Controller) 시작 ###");
-        log.info("요청 파라미터 (virtual): {}", useVirtualServer);
-        log.info("요청 바디 (orderRequest) - 종목코드: {}, 주문유형: {}, 수량: {}", 
-                orderRequest.getStockCode(), orderRequest.getOrderType(), orderRequest.getQuantity());
-        log.info("------------------------------------------");
+        secureLogger.safeLog("KIS 주문 요청 (Controller) - virtual: " + useVirtualServer, orderRequest);
 
         Long currentUserId = SecurityUtil.getCurrentUserId();
         if (currentUserId == null) {

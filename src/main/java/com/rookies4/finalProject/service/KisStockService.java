@@ -50,16 +50,32 @@ public class KisStockService {
                 .queryParam("FID_COND_MRKT_DIV_CODE", "J")
                 .queryParam("FID_INPUT_ISCD", stockCode);
 
-        HttpHeaders headers = new HttpHeaders();
-        headers.set("authorization", "Bearer " + accessToken);
-        headers.set("appkey", encryptionUtil.decrypt(user.getAppkey())); // 복호화 사용
-        headers.set("appsecret", encryptionUtil.decrypt(user.getAppsecret())); // 복호화 사용
-        headers.set("tr_id", "FHKST01010100");
-        headers.setContentType(MediaType.APPLICATION_JSON);
-
-        HttpEntity<Void> requestEntity = new HttpEntity<>(headers);
-
         try {
+            // 복호화 및 검증
+            String decryptedAppkey = encryptionUtil.decrypt(user.getAppkey());
+            String decryptedAppsecret = encryptionUtil.decrypt(user.getAppsecret());
+
+            // 복호화된 값을 트림하여 사용
+            String appkey = decryptedAppkey == null ? null : decryptedAppkey.trim();
+            String appsecret = decryptedAppsecret == null ? null : decryptedAppsecret.trim();
+
+            if (appkey == null || appkey.isEmpty()) {
+                log.error("복호화된 appkey가 유효하지 않습니다. userId={}", userId);
+                throw new BusinessException(ErrorCode.KIS_API_KEY_NOT_FOUND, "KIS API 키가 유효하지 않습니다.");
+            }
+            if (appsecret == null || appsecret.isEmpty()) {
+                log.error("복호화된 appsecret이 유효하지 않습니다. userId={}", userId);
+                throw new BusinessException(ErrorCode.KIS_API_SECRET_NOT_FOUND, "KIS API Secret이 유효하지 않습니다.");
+            }
+
+            HttpHeaders headers = new HttpHeaders();
+            headers.set("authorization", "Bearer " + accessToken);
+            headers.set("appkey", appkey);
+            headers.set("appsecret", appsecret);
+            headers.set("tr_id", "FHKST01010100");
+            headers.setContentType(MediaType.APPLICATION_JSON);
+
+            HttpEntity<Void> requestEntity = new HttpEntity<>(headers);
             ResponseEntity<Map> response = restTemplate.exchange(
                     builder.toUriString(),
                     HttpMethod.GET,
@@ -99,9 +115,17 @@ public class KisStockService {
                     .updatedAt(java.time.LocalDateTime.now())
                     .build();
 
+        } catch (BusinessException e) {
+            // BusinessException은 이미 적절한 에러 코드와 메시지를 가지고 있으므로 재전파
+            throw e;
         } catch (RestClientException e) {
+            log.error("KIS API 호출 중 네트워크 오류 발생. stockCode={}, userId={}", stockCode, userId, e);
             throw new BusinessException(ErrorCode.KIS_API_ERROR,
                     "KIS API 호출 실패: " + e.getMessage());
+        } catch (Exception e) {
+            log.error("현재가 조회 중 예상치 못한 오류 발생. stockCode={}, userId={}", stockCode, userId, e);
+            throw new BusinessException(ErrorCode.INTERNAL_SERVER_ERROR,
+                    "현재가 조회 중 오류가 발생했습니다.");
         }
     }
 
