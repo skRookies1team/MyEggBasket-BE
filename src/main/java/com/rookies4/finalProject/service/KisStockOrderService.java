@@ -2,6 +2,7 @@ package com.rookies4.finalProject.service;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.rookies4.finalProject.component.SecureLogger;
 import com.rookies4.finalProject.config.KisApiConfig;
 import com.rookies4.finalProject.domain.entity.KisAuthToken;
 import com.rookies4.finalProject.domain.entity.User;
@@ -33,6 +34,7 @@ public class KisStockOrderService {
     private final RestTemplate restTemplate;
     private final KisAuthRepository kisAuthRepository;
     private final ObjectMapper objectMapper;
+    private final SecureLogger secureLogger;
 
     /**
      * KIS 주문 (매수 / 매도)
@@ -46,7 +48,7 @@ public class KisStockOrderService {
             throw new BusinessException(ErrorCode.USER_NOT_FOUND, "사용자 정보가 없습니다.");
         }
 
-        // ===== 1. 요청값 검증 (🔥 중요) =====
+        // ===== 1. 요청값 검증 =====
         Integer qty = request.getQuantity();
         Integer price = request.getPrice();
 
@@ -79,7 +81,7 @@ public class KisStockOrderService {
         headers.set("tr_id", tradeId);
         headers.set("custtype", "P");
 
-        // ===== 6. Body (🔥 핵심 수정) =====
+        // ===== 6. Body =====
         Map<String, String> body = new HashMap<>();
         body.put("CANO", user.getAccount());
         body.put("ACNT_PRDT_CD", "01");
@@ -101,7 +103,7 @@ public class KisStockOrderService {
         log.info("### KIS 주문 요청 ({} ) ###", useVirtualServer ? "모의" : "실전");
         log.info("URL: {}", uri);
         log.info("tr_id: {}", tradeId);
-        log.info("Request Body: {}", bodyJson);
+        log.info("Request Body: {}", secureLogger.maskSensitive(bodyJson));
 
         // ===== 8. 호출 =====
         try {
@@ -113,7 +115,11 @@ public class KisStockOrderService {
                             KisStockOrderDTO.OrderResponse.class
                     );
 
-            log.info("KIS 주문 응답: {}", response.getBody());
+            try {
+                log.info("KIS 주문 응답: {}", secureLogger.maskSensitiveJson(response.getBody()));
+            } catch (JsonProcessingException e) {
+                log.error("응답 로깅 중 오류 발생", e);
+            }
             return response.getBody();
 
         } catch (RestClientResponseException e) {

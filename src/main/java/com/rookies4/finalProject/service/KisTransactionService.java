@@ -2,6 +2,7 @@ package com.rookies4.finalProject.service;
 
 import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.rookies4.finalProject.component.SecureLogger;
 import com.rookies4.finalProject.config.KisApiConfig;
 import com.rookies4.finalProject.domain.entity.User;
 import com.rookies4.finalProject.dto.KisTransactionDTO;
@@ -31,6 +32,7 @@ public class KisTransactionService {
 
     private final RestTemplate restTemplate;
     private final ObjectMapper objectMapper; // 스프링 기본 ObjectMapper 주입
+    private final SecureLogger secureLogger;
 
     // 한국투자증권 [주식일별주문체결조회] API 호출
     public KisTransactionDTO getDailyOrderHistory(User user, String accessToken, boolean useVirtual) {
@@ -96,7 +98,7 @@ public class KisTransactionService {
 
             String bodyStr = resp.getBody();
             log.info("[KIS_ORDER] raw 응답: status={}, body={}",
-                    resp.getStatusCode(), bodyStr);
+                    resp.getStatusCode(), secureLogger.maskSensitive(bodyStr));
 
             if (bodyStr == null || bodyStr.isBlank()) {
                 log.warn("[KIS_ORDER] 주문내역 조회 응답 body 가 비어있음, userId={}", user.getId());

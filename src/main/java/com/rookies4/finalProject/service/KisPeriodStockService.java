@@ -1,6 +1,7 @@
 package com.rookies4.finalProject.service;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.rookies4.finalProject.component.SecureLogger;
 import com.rookies4.finalProject.config.KisApiConfig;
 import com.rookies4.finalProject.domain.entity.User;
 import com.rookies4.finalProject.dto.KisAuthTokenDTO;
@@ -36,6 +37,7 @@ public class KisPeriodStockService {
     private final UserRepository userRepository;
     private final KisAuthService kisAuthService;
     private final ObjectMapper objectMapper;
+    private final SecureLogger secureLogger;
 
     public KisPeriodStockDTO.ChartResponse getChartData(String stockCode, String period, Long userId) {
         User user = userRepository.findById(userId)
@@ -78,7 +80,7 @@ public class KisPeriodStockService {
             Map<String, Object> body = response.getBody();
             
             try {
-                log.info("KIS Chart API Response: {}", objectMapper.writeValueAsString(body));
+                log.info("KIS Chart API Response: {}", secureLogger.maskSensitiveJson(body));
             } catch (Exception e) {
                 log.error("Failed to log API response", e);
             }

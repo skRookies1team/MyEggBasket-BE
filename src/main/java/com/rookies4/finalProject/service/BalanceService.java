@@ -1,5 +1,6 @@
 package com.rookies4.finalProject.service;
 
+import com.rookies4.finalProject.component.SecureLogger;
 import com.rookies4.finalProject.domain.entity.User;
 import com.rookies4.finalProject.dto.BalanceDTO;
 import com.rookies4.finalProject.dto.KisBalanceDTO;
@@ -20,6 +21,7 @@ public class BalanceService {
 
     private final UserRepository userRepository;
     private final BalanceSyncService balanceSyncService;
+    private final SecureLogger secureLogger;
 
     /**
      * 로그인 유저 기준 잔고 조회
@@ -61,7 +63,11 @@ public class BalanceService {
     }
 
     private BalanceDTO.Response toBalanceResponse(KisBalanceDTO kis) {
-        log.info("[BALANCE] KisBalanceDTO raw = {}", kis);
+        try {
+            log.info("[BALANCE] KisBalanceDTO raw = {}", secureLogger.maskSensitiveJson(kis));
+        } catch (Exception e) {
+            log.error("[BALANCE] Failed to mask sensitive data in log", e);
+        }
         log.info("[BALANCE] output1 size = {}, output2 size = {}",
                 kis.getOutput1() == null ? null : kis.getOutput1().size(),
                 kis.getOutput2() == null ? null : kis.getOutput2().size());
