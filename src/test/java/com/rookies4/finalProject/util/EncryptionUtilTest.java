@@ -66,8 +66,8 @@ class EncryptionUtilTest {
     }
 
     @Test
-    @DisplayName("동일한 평문을 여러 번 암호화하면 동일한 암호문 생성 (ECB 모드)")
-    void encrypt_same_plaintext_produces_same_ciphertext() {
+    @DisplayName("동일한 평문을 여러 번 암호화하면 서로 다른 암호문 생성 (GCM 모드 - 랜덤 IV)")
+    void encrypt_same_plaintext_produces_different_ciphertexts() {
         // given
         String plainText = "test-data";
 
@@ -76,7 +76,12 @@ class EncryptionUtilTest {
         String encrypted2 = encryptionUtil.encrypt(plainText);
 
         // then
-        assertThat(encrypted1).isEqualTo(encrypted2);
+        // 랜덤 IV로 인해 암호문이 달라야 함
+        assertThat(encrypted1).isNotEqualTo(encrypted2);
+        
+        // 하지만 둘 다 정상적으로 복호화되어 원본과 일치해야 함
+        assertThat(encryptionUtil.decrypt(encrypted1)).isEqualTo(plainText);
+        assertThat(encryptionUtil.decrypt(encrypted2)).isEqualTo(plainText);
     }
 
     @Test
@@ -171,6 +176,29 @@ class EncryptionUtilTest {
     }
 
     @Test
+    @DisplayName("레거시 ECB 암호화 데이터 복호화 (하위 호환성)")
+    void decrypt_legacy_ecb_data() throws Exception {
+        // given - ECB 모드로 암호화된 데이터 시뮬레이션
+        String plainText = "legacy-test-data";
+        
+        // ECB 암호화 수행 (레거시 방식)
+        javax.crypto.Cipher cipher = javax.crypto.Cipher.getInstance("AES/ECB/PKCS5Padding");
+        String secretKey = "test-secret-key-for-encryption";
+        java.security.MessageDigest sha = java.security.MessageDigest.getInstance("SHA-256");
+        byte[] key = sha.digest(secretKey.getBytes(java.nio.charset.StandardCharsets.UTF_8));
+        javax.crypto.spec.SecretKeySpec keySpec = new javax.crypto.spec.SecretKeySpec(key, "AES");
+        cipher.init(javax.crypto.Cipher.ENCRYPT_MODE, keySpec);
+        byte[] encrypted = cipher.doFinal(plainText.getBytes(java.nio.charset.StandardCharsets.UTF_8));
+        String legacyEncryptedText = java.util.Base64.getEncoder().encodeToString(encrypted);
+        
+        // when - 새로운 EncryptionUtil로 레거시 데이터 복호화
+        String decrypted = encryptionUtil.decrypt(legacyEncryptedText);
+        
+        // then - 정상적으로 복호화되어야 함
+        assertThat(decrypted).isEqualTo(plainText);
+    }
+
+    @Test
     @DisplayName("잘못된 암호문 복호화 시 예외 발생")
     void decrypt_invalid_ciphertext_throws_exception() {
         // given
@@ -178,6 +206,6 @@ class EncryptionUtilTest {
 
         // when & then
         assertThatThrownBy(() -> encryptionUtil.decrypt(invalidCiphertext))
-                .hasMessageContaining("데이터 복호화 중 오류가 발생했습니다.");
+                .hasMessageContaining("서버 내부 오류가 발생했습니다.");
     }
 }
