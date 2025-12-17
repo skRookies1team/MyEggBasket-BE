@@ -2,6 +2,8 @@ package com.rookies4.finalProject.runner;
 
 import com.rookies4.finalProject.domain.entity.Stock;
 import com.rookies4.finalProject.repository.StockRepository;
+import jakarta.persistence.EntityManager;
+import jakarta.persistence.PersistenceContext;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.CommandLineRunner;
@@ -26,12 +28,22 @@ public class MasterStockRunner implements CommandLineRunner {
 
     private final StockRepository stockRepository;
 
+    @PersistenceContext
+    private EntityManager entityManager;
+
     // 한국에서 내려받는 CSV는 100% CP949(EUC-KR) 기반
     private static final Charset CSV_CHARSET = Charset.forName("CP949");
 
     @Override
     @Transactional
     public void run(String... args) throws Exception {
+
+        // 재실행 방지 (DB 기준)
+        if (stockRepository.count() > 0) {
+            log.info("Stock 엔티티에 데이터가 이미 들어있습니다. MasterStockRunner 실행을 스킵합니다.");
+            return;
+        }
+
         log.info("=== Master Stock Data Loading Started ===");
 
         // 1. 업종명(Sector) 매핑 데이터 로드
@@ -43,7 +55,7 @@ public class MasterStockRunner implements CommandLineRunner {
         Map<String, String> industryCodeMap = new HashMap<>();
         loadIndustryCodeData(industryCodeMap, "data/data_industry_code.csv");
 
-        // 3. 법인고유번호(CorpCode) 매핑 데이터 로드 (추가됨)
+        // 3. 법인고유번호(CorpCode) 매핑 데이터 로드
         Map<String, String> corpCodeMap = new HashMap<>();
         loadCorpCodeData(corpCodeMap, "data/integrated_financial_data.csv");
 
@@ -68,7 +80,7 @@ public class MasterStockRunner implements CommandLineRunner {
 
             while ((line = reader.readLine()) != null) {
 
-                if (isFirstLine) {  // header skip
+                if (isFirstLine) { // header skip
                     isFirstLine = false;
                     continue;
                 }
@@ -76,7 +88,6 @@ public class MasterStockRunner implements CommandLineRunner {
                 String[] columns = parseCsvLine(line);
 
                 if (columns.length < 7) {
-                    log.warn("Invalid CSV line (columns < 7): {}", line);
                     skippedCount++;
                     continue;
                 }
@@ -88,12 +99,11 @@ public class MasterStockRunner implements CommandLineRunner {
 
                     String sector = sectorMap.get(stockCode);
                     String industryCode = industryCodeMap.get(stockCode);
-                    // corpCodeMap에서 종목코드를 키로 고유번호(8자리)를 가져옴
                     String corpCode = corpCodeMap.get(stockCode);
 
                     Stock stock = Stock.builder()
                             .stockCode(stockCode)
-                            .corpCode(corpCode) // 엔티티에 추가된 필드에 매핑
+                            .corpCode(corpCode)
                             .name(name)
                             .marketType(marketType)
                             .sector(sector)
@@ -104,7 +114,12 @@ public class MasterStockRunner implements CommandLineRunner {
                     processedCount++;
 
                     if (stocks.size() >= 1000) {
-                        stockRepository.saveAll(stocks);
+                        for (Stock s : stocks) {
+                            entityManager.persist(s);
+                        }
+                        entityManager.flush();
+                        entityManager.clear();
+
                         savedCount += stocks.size();
                         stocks.clear();
                     }
@@ -116,21 +131,23 @@ public class MasterStockRunner implements CommandLineRunner {
             }
 
             if (!stocks.isEmpty()) {
-                stockRepository.saveAll(stocks);
+                for (Stock s : stocks) {
+                    entityManager.persist(s);
+                }
+                entityManager.flush();
+                entityManager.clear();
+
                 savedCount += stocks.size();
             }
 
-            log.info("Job Finished. Processed: {}, Saved: {}, Skipped: {}", processedCount, savedCount, skippedCount);
+            log.info("Job Finished. Processed: {}, Saved: {}, Skipped: {}",
+                    processedCount, savedCount, skippedCount);
 
         } catch (IOException e) {
             log.error("Failed to read CSV file", e);
         }
     }
 
-    /**
-     * 법인고유번호(CorpCode) 데이터 로드 (추가됨)
-     * integrated_financial_data.csv: stock_code(0), corp_code(1)
-     */
     private void loadCorpCodeData(Map<String, String> map, String classpathLocation) {
         Resource resource = new ClassPathResource(classpathLocation);
 
@@ -152,7 +169,6 @@ public class MasterStockRunner implements CommandLineRunner {
                 }
 
                 String[] cols = parseCsvLine(line);
-                // CSV 구조 확인: 0번째가 종목코드, 1번째가 법인코드
                 if (cols.length >= 2) {
                     String stockCode = cleanCsvValue(cols[1]);
                     String corpCode = cleanCsvValue(cols[13]);
@@ -167,9 +183,6 @@ public class MasterStockRunner implements CommandLineRunner {
         }
     }
 
-    /**
-     * 업종명(Sector) 데이터 로드
-     */
     private void loadSectorData(Map<String, String> map, String classpathLocation) {
         Resource resource = new ClassPathResource(classpathLocation);
 
@@ -205,9 +218,6 @@ public class MasterStockRunner implements CommandLineRunner {
         }
     }
 
-    /**
-     * 업종코드(IndustryCode) 데이터 로드
-     */
     private void loadIndustryCodeData(Map<String, String> map, String classpathLocation) {
         Resource resource = new ClassPathResource(classpathLocation);
 
@@ -243,9 +253,6 @@ public class MasterStockRunner implements CommandLineRunner {
         }
     }
 
-    /**
-     * CSV 파서
-     */
     private String[] parseCsvLine(String line) {
         List<String> columns = new ArrayList<>();
         StringBuilder current = new StringBuilder();
@@ -268,9 +275,6 @@ public class MasterStockRunner implements CommandLineRunner {
         return columns.toArray(new String[0]);
     }
 
-    /**
-     * CSV 값 trim & 따옴표 제거
-     */
     private String cleanCsvValue(String value) {
         if (value == null) return null;
         String cleaned = value.trim();
