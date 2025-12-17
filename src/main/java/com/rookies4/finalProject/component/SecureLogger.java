@@ -84,11 +84,10 @@ public class SecureLogger {
             return maskSensitiveJson(json);
         } catch (Exception e) {
             // JSON 파싱 실패 시, 정규식으로 마스킹
-            log.debug("JSON 파싱 실패, 정규식으로 마스킹 진행: {}", e.getMessage());
+            log.debug("JSON 파싱 실패, 정규식으로 마스킹 진행");
             return maskSensitiveWithRegex(json);
         }
     }
-
     /**
      * 정규식을 사용하여 민감 정보를 마스킹합니다.
      * 
@@ -175,7 +174,7 @@ public class SecureLogger {
 
         String lowerFieldName = fieldName.toLowerCase();
         return SENSITIVE_FIELDS.stream()
-                .anyMatch(sensitiveField -> lowerFieldName.contains(sensitiveField.toLowerCase()));
+                .anyMatch(sensitiveField -> lowerFieldName.equals(sensitiveField.toLowerCase()));
     }
 
     /**

@@ -30,8 +30,8 @@ public class SwaggerConfig {
 
     private Info apiInfo() {
         return new Info()
-                .title("My Salon")
-                .description("My Salon의 api입니다.")
+                .title("My Egg Basket API")
+                .description("My Egg Basket 백엔드 API 문서입니다. Swagger UI에서 JWT Bearer 인증을 설정한 후 각 엔드포인트를 테스트할 수 있습니다.\n\n사용 방법:\n1) Swagger UI 접속: /swagger-ui/index.html\n2) 우상단 'Authorize' 클릭 후 토큰 입력 (Bearer 자동 적용)\n3) 필요한 요청 파라미터를 채우고 'Try it out'으로 테스트")
                 .version("1.0");
     }
 }
