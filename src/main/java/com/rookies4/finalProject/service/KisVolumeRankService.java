@@ -1,6 +1,7 @@
 package com.rookies4.finalProject.service;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.rookies4.finalProject.component.SecureLogger;
 import com.rookies4.finalProject.config.KisApiConfig;
 import com.rookies4.finalProject.domain.entity.KisAuthToken;
 import com.rookies4.finalProject.domain.entity.User;
@@ -35,6 +36,7 @@ public class KisVolumeRankService {
     private final RestTemplate restTemplate;
     private final KisAuthRepository kisAuthRepository;
     private final ObjectMapper objectMapper; // JSON 로깅용
+    private final SecureLogger secureLogger; // 민감 정보 마스킹용
 
     /**
      * 거래량 순위 TOP 10 조회 후 프론트엔드용 DTO로 변환하여 반환
@@ -99,7 +101,7 @@ public class KisVolumeRankService {
             
             // [디버깅] API 응답 로그 출력
             try {
-                log.info("KIS Volume Rank API Response: {}", objectMapper.writeValueAsString(body));
+                log.info("KIS Volume Rank API Response: {}", secureLogger.maskSensitiveJson(body));
             } catch (Exception e) {
                 log.error("Failed to log API response", e);
             }
