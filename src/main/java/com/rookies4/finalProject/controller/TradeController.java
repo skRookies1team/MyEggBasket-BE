@@ -1,5 +1,6 @@
 package com.rookies4.finalProject.controller;
 
+import com.rookies4.finalProject.component.SecureLogger;
 import com.rookies4.finalProject.domain.entity.User;
 import com.rookies4.finalProject.dto.BalanceDTO;
 import com.rookies4.finalProject.dto.KisStockOrderDTO;
@@ -23,12 +24,13 @@ import org.springframework.web.bind.annotation.*;
 @RequiredArgsConstructor
 public class TradeController {
 
-    private static final Logger log = LoggerFactory.getLogger(TradeController.class); // Logger 인스턴스 생성
+    private static final Logger log = LoggerFactory.getLogger(TradeController.class);
 
     private final KisStockOrderService kisStockOrderService;
     private final TransactionService transactionService;
     private final BalanceService balanceService;
     private final UserRepository userRepository;
+    private final SecureLogger secureLogger;
 
     // 1. 매수/매도 주문
     @PostMapping
@@ -38,8 +40,8 @@ public class TradeController {
 
         log.info("### KIS 주문 요청 (Controller) 시작 ###");
         log.info("요청 파라미터 (virtual): {}", useVirtualServer);
-        // orderRequest 객체의 내용을 로깅합니다. (toString() 메서드가 잘 구현되어 있어야 유용합니다)
-        log.info("요청 바디 (orderRequest): {}", orderRequest);
+        log.info("요청 바디 (orderRequest) - 종목코드: {}, 주문유형: {}, 수량: {}", 
+                orderRequest.getStockCode(), orderRequest.getOrderType(), orderRequest.getQuantity());
         log.info("------------------------------------------");
 
         Long currentUserId = SecurityUtil.getCurrentUserId();

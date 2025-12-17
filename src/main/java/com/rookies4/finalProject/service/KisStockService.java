@@ -33,6 +33,7 @@ public class KisStockService {
     private final UserRepository userRepository;
     private final StockRepository stockRepository;
     private final KisAuthService kisAuthService;
+    private final EncryptionUtil encryptionUtil;
 
     public CurrentPriceDTO getCurrentPrice(String stockCode, boolean useVirtualServer, Long userId) {
         User user = userRepository.findById(userId)
@@ -51,8 +52,8 @@ public class KisStockService {
 
         HttpHeaders headers = new HttpHeaders();
         headers.set("authorization", "Bearer " + accessToken);
-        headers.set("appkey", EncryptionUtil.decrypt(user.getAppkey())); // 복호화 사용
-        headers.set("appsecret", EncryptionUtil.decrypt(user.getAppsecret())); // 복호화 사용
+        headers.set("appkey", encryptionUtil.decrypt(user.getAppkey())); // 복호화 사용
+        headers.set("appsecret", encryptionUtil.decrypt(user.getAppsecret())); // 복호화 사용
         headers.set("tr_id", "FHKST01010100");
         headers.setContentType(MediaType.APPLICATION_JSON);
 

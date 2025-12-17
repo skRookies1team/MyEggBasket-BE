@@ -37,6 +37,7 @@ public class KisInvestorTrendService {
     private final StockRepository stockRepository;
     private final KisAuthService kisAuthService;
     private final ObjectMapper objectMapper;
+    private final EncryptionUtil encryptionUtil;
 
     public KisInvestorTrendDTO.InvestorTrendResponse getInvestorTrend(String stockCode, Long userId) {
         User user = userRepository.findById(userId)
@@ -53,8 +54,8 @@ public class KisInvestorTrendService {
 
         HttpHeaders headers = new HttpHeaders();
         headers.set("authorization", "Bearer " + accessToken);
-        headers.set("appkey", EncryptionUtil.decrypt(user.getAppkey())); // 복호화 사용
-        headers.set("appsecret", EncryptionUtil.decrypt(user.getAppsecret())); // 복호화 사용
+        headers.set("appkey", encryptionUtil.decrypt(user.getAppkey())); // 복호화 사용
+        headers.set("appsecret", encryptionUtil.decrypt(user.getAppsecret())); // 복호화 사용
         headers.set("tr_id", "FHKST01010900");
         headers.setContentType(MediaType.APPLICATION_JSON);
 

@@ -29,6 +29,7 @@ public class KisBalanceService {
 
     private final RestTemplate restTemplate;
     private final ObjectMapper objectMapper; // 스프링 기본 ObjectMapper 주입
+    private final EncryptionUtil encryptionUtil;
 
     // KIS [주식잔고조회] API 호출
     public KisBalanceDTO getBalanceFromKis(User user, String accessToken, boolean useVirtual) {
@@ -44,8 +45,8 @@ public class KisBalanceService {
         headers.setAccept(List.of(MediaType.APPLICATION_JSON)); // 응답 형식 JSON
 
         headers.set("authorization", "Bearer " + accessToken); // KIS가 요구하는 accessToken
-        headers.set("appkey", EncryptionUtil.decrypt(user.getAppkey())); // 암호화된 appkey 복호화해서 삽입
-        headers.set("appsecret", EncryptionUtil.decrypt(user.getAppsecret())); // 암호화된 appsecret 복호화해서 삽입
+        headers.set("appkey", encryptionUtil.decrypt(user.getAppkey())); // 암호화된 appkey 복호화해서 삽입
+        headers.set("appsecret", encryptionUtil.decrypt(user.getAppsecret())); // 암호화된 appsecret 복호화해서 삽입
 
         // TR_ID 설정 (실전: TTTC8434R, 모의: VTTC8434R)
         if (useVirtual) {

@@ -35,6 +35,7 @@ public class KisStockOrderService {
     private final KisAuthRepository kisAuthRepository;
     private final ObjectMapper objectMapper;
     private final SecureLogger secureLogger;
+    private final EncryptionUtil encryptionUtil;
 
     /**
      * KIS 주문 (매수 / 매도)
@@ -76,8 +77,8 @@ public class KisStockOrderService {
         HttpHeaders headers = new HttpHeaders();
         headers.setContentType(MediaType.APPLICATION_JSON);
         headers.set("authorization", token.getTokenType() + " " + token.getAccessToken());
-        headers.set("appkey", EncryptionUtil.decrypt(user.getAppkey()));
-        headers.set("appsecret", EncryptionUtil.decrypt(user.getAppsecret()));
+        headers.set("appkey", encryptionUtil.decrypt(user.getAppkey()));
+        headers.set("appsecret", encryptionUtil.decrypt(user.getAppsecret()));
         headers.set("tr_id", tradeId);
         headers.set("custtype", "P");
 
