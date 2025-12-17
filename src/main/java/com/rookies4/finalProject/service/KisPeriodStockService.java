@@ -1,25 +1,15 @@
 package com.rookies4.finalProject.service;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.rookies4.finalProject.component.SecureLogger;
-import com.rookies4.finalProject.config.KisApiConfig;
-import com.rookies4.finalProject.domain.entity.User;
-import com.rookies4.finalProject.dto.KisAuthTokenDTO;
+import com.rookies4.finalProject.component.KisApiClient;
+import com.rookies4.finalProject.dto.KisApiRequest;
 import com.rookies4.finalProject.dto.KisPeriodStockDTO;
 import com.rookies4.finalProject.exception.BusinessException;
 import com.rookies4.finalProject.exception.ErrorCode;
-import com.rookies4.finalProject.repository.UserRepository;
-import com.rookies4.finalProject.util.EncryptionUtil; // EncryptionUtil 임포트
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.http.*;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import org.springframework.web.client.RestClientException;
-import org.springframework.web.client.RestTemplate;
-import org.springframework.web.util.UriComponentsBuilder;
 
-import java.net.URI;
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
 import java.util.Collections;
@@ -33,90 +23,55 @@ import java.util.stream.Collectors;
 @Transactional(readOnly = true)
 public class KisPeriodStockService {
 
-    private final RestTemplate restTemplate;
-    private final UserRepository userRepository;
-    private final KisAuthService kisAuthService;
-    private final ObjectMapper objectMapper;
-    private final SecureLogger secureLogger;
-    private final EncryptionUtil encryptionUtil;
+    private final KisApiClient kisApiClient;
 
+    @SuppressWarnings("unchecked")
     public KisPeriodStockDTO.ChartResponse getChartData(String stockCode, String period, Long userId) {
-        User user = userRepository.findById(userId)
-                .orElseThrow(() -> new BusinessException(ErrorCode.USER_NOT_FOUND));
-        KisAuthTokenDTO.KisTokenResponse tokenResponse = kisAuthService.issueToken(false, user);
-        String accessToken = tokenResponse.getAccessToken();
-
-        String path = "/uapi/domestic-stock/v1/quotations/inquire-daily-itemchartprice";
-        URI uri = KisApiConfig.uri(false, path);
-
         String periodCode = getPeriodCode(period);
         String startDate = getStartDate(period);
         String endDate = LocalDate.now().format(DateTimeFormatter.ofPattern("yyyyMMdd"));
 
-        UriComponentsBuilder builder = UriComponentsBuilder.fromUri(uri)
-                .queryParam("FID_COND_MRKT_DIV_CODE", "J")
-                .queryParam("FID_INPUT_ISCD", stockCode)
-                .queryParam("FID_INPUT_DATE_1", startDate)
-                .queryParam("FID_INPUT_DATE_2", endDate)
-                .queryParam("FID_PERIOD_DIV_CODE", periodCode)
-                .queryParam("FID_ORG_ADJ_PRC", "1");
+        KisApiRequest request = KisApiRequest.builder()
+                .path("/uapi/domestic-stock/v1/quotations/inquire-daily-itemchartprice")
+                .trId("FHKST03010100")
+                .param("FID_COND_MRKT_DIV_CODE", "J")
+                .param("FID_INPUT_ISCD", stockCode)
+                .param("FID_INPUT_DATE_1", startDate)
+                .param("FID_INPUT_DATE_2", endDate)
+                .param("FID_PERIOD_DIV_CODE", periodCode)
+                .param("FID_ORG_ADJ_PRC", "1")
+                .useVirtualServer(false)
+                .build();
 
-        HttpHeaders headers = new HttpHeaders();
-        headers.set("authorization", "Bearer " + accessToken);
-        headers.set("appkey", encryptionUtil.decrypt(user.getAppkey())); // 복호화 사용
-        headers.set("appsecret", encryptionUtil.decrypt(user.getAppsecret())); // 복호화 사용
-        headers.set("tr_id", "FHKST03010100");
-        headers.setContentType(MediaType.APPLICATION_JSON);
+        Map<String, Object> body = kisApiClient.get(userId, request, Map.class);
 
-        HttpEntity<Void> requestEntity = new HttpEntity<>(headers);
+        if (body == null || body.get("rt_cd") == null || ((String)body.get("rt_cd")).isEmpty()) {
+             throw new BusinessException(ErrorCode.KIS_API_ERROR, "KIS API로부터 유효하지 않은 응답을 받았습니다.");
+        }
 
-        try {
-            ResponseEntity<Map> response = restTemplate.exchange(
-                    builder.toUriString(),
-                    HttpMethod.GET,
-                    requestEntity,
-                    Map.class
-            );
+        if (!"0".equals(body.get("rt_cd"))) {
+            String msg = (String) body.get("msg1");
+            throw new BusinessException(ErrorCode.KIS_API_ERROR, "차트 데이터 조회 실패: " + msg);
+        }
 
-            Map<String, Object> body = response.getBody();
-            
-            try {
-                log.info("KIS Chart API Response: {}", secureLogger.maskSensitiveJson(body));
-            } catch (Exception e) {
-                log.error("Failed to log API response", e);
-            }
-
-            if (body == null || body.get("rt_cd") == null || ((String)body.get("rt_cd")).isEmpty()) {
-                 throw new BusinessException(ErrorCode.KIS_API_ERROR, "KIS API로부터 유효하지 않은 응답을 받았습니다.");
-            }
-
-            if (!"0".equals(body.get("rt_cd"))) {
-                String msg = (String) body.get("msg1");
-                throw new BusinessException(ErrorCode.KIS_API_ERROR, "차트 데이터 조회 실패: " + msg);
-            }
-
-            List<Map<String, Object>> output2 = (List<Map<String, Object>>) body.get("output2");
-            if (output2 == null) {
-                return KisPeriodStockDTO.ChartResponse.builder()
-                        .stockCode(stockCode)
-                        .period(period)
-                        .data(Collections.emptyList())
-                        .build();
-            }
-
-            List<KisPeriodStockDTO.ChartData> chartData = output2.stream()
-                    .map(this::transformToChartData)
-                    .collect(Collectors.toList());
-
+        List<Map<String, Object>> output2 = (List<Map<String, Object>>) body.get("output2");
+        if (output2 == null) {
             return KisPeriodStockDTO.ChartResponse.builder()
                     .stockCode(stockCode)
                     .period(period)
-                    .data(chartData)
+                    .data(Collections.emptyList())
                     .build();
-
-        } catch (RestClientException e) {
-            throw new BusinessException(ErrorCode.KIS_API_ERROR, "KIS API 호출 실패: " + e.getMessage());
         }
+
+        List<KisPeriodStockDTO.ChartData> chartData = output2.stream()
+                .map(this::transformToChartData)
+                .collect(Collectors.toList());
+
+        return KisPeriodStockDTO.ChartResponse.builder()
+                .stockCode(stockCode)
+                .period(period)
+                .data(chartData)
+                .build();
     }
 
     private KisPeriodStockDTO.ChartData transformToChartData(Map<String, Object> output) {
