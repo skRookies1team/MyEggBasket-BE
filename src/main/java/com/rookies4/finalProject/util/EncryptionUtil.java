@@ -75,8 +75,7 @@ public class EncryptionUtil {
             
             return Base64.getEncoder().encodeToString(byteBuffer.array());
         } catch (Exception e) {
-            log.error("암호화 실패: plainText length={}", plainText.length(), e);
-            throw new BusinessException(ErrorCode.INTERNAL_SERVER_ERROR, "데이터 암호화 중 오류가 발생했습니다.");
+            log.error("암호화 실패", e);            throw new BusinessException(ErrorCode.INTERNAL_SERVER_ERROR, "데이터 암호화 중 오류가 발생했습니다.");
         }
     }
 
@@ -119,6 +118,11 @@ public class EncryptionUtil {
      */
     private String decryptGCM(String encryptedText) throws Exception {
         byte[] decodedBytes = Base64.getDecoder().decode(encryptedText);
+        
+        // Validate minimum length (IV + at least some ciphertext)
+        if (decodedBytes.length < GCM_IV_LENGTH) {
+            throw new IllegalArgumentException("암호문 길이가 너무 짧습니다");
+        }
         
         // IV와 암호문 분리
         ByteBuffer byteBuffer = ByteBuffer.wrap(decodedBytes);
