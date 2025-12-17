@@ -29,6 +29,7 @@ public class StockService {
                 .stockCode(request.getStockCode())
                 .name(request.getName())
                 .marketType(request.getMarketType())
+                .corpCode(request.getCorpCode())
                 .sector(request.getSector())
                 .industryCode(request.getIndustryCode())
                 .build();

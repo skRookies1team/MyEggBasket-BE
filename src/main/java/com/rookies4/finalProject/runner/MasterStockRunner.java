@@ -43,7 +43,11 @@ public class MasterStockRunner implements CommandLineRunner {
         Map<String, String> industryCodeMap = new HashMap<>();
         loadIndustryCodeData(industryCodeMap, "data/data_industry_code.csv");
 
-        // 3. 주식 기본 데이터 로드
+        // 3. 법인고유번호(CorpCode) 매핑 데이터 로드 (추가됨)
+        Map<String, String> corpCodeMap = new HashMap<>();
+        loadCorpCodeData(corpCodeMap, "data/integrated_financial_data.csv");
+
+        // 4. 주식 기본 데이터 로드
         Resource stockResource = new ClassPathResource("data/data_stock.csv");
 
         if (!stockResource.exists()) {
@@ -84,9 +88,12 @@ public class MasterStockRunner implements CommandLineRunner {
 
                     String sector = sectorMap.get(stockCode);
                     String industryCode = industryCodeMap.get(stockCode);
+                    // corpCodeMap에서 종목코드를 키로 고유번호(8자리)를 가져옴
+                    String corpCode = corpCodeMap.get(stockCode);
 
                     Stock stock = Stock.builder()
                             .stockCode(stockCode)
+                            .corpCode(corpCode) // 엔티티에 추가된 필드에 매핑
                             .name(name)
                             .marketType(marketType)
                             .sector(sector)
@@ -117,6 +124,46 @@ public class MasterStockRunner implements CommandLineRunner {
 
         } catch (IOException e) {
             log.error("Failed to read CSV file", e);
+        }
+    }
+
+    /**
+     * 법인고유번호(CorpCode) 데이터 로드 (추가됨)
+     * integrated_financial_data.csv: stock_code(0), corp_code(1)
+     */
+    private void loadCorpCodeData(Map<String, String> map, String classpathLocation) {
+        Resource resource = new ClassPathResource(classpathLocation);
+
+        if (!resource.exists()) {
+            log.warn("{} not found, skipping corp_code loading.", classpathLocation);
+            return;
+        }
+
+        try (BufferedReader reader =
+                     new BufferedReader(new InputStreamReader(resource.getInputStream(), CSV_CHARSET))) {
+
+            String line;
+            boolean isFirst = true;
+
+            while ((line = reader.readLine()) != null) {
+                if (isFirst) {
+                    isFirst = false;
+                    continue;
+                }
+
+                String[] cols = parseCsvLine(line);
+                // CSV 구조 확인: 0번째가 종목코드, 1번째가 법인코드
+                if (cols.length >= 2) {
+                    String stockCode = cleanCsvValue(cols[1]);
+                    String corpCode = cleanCsvValue(cols[13]);
+                    map.put(stockCode, corpCode);
+                }
+            }
+
+            log.info("Loaded {} corp_codes from {}", map.size(), classpathLocation);
+
+        } catch (IOException e) {
+            log.error("Error reading {}", classpathLocation, e);
         }
     }
 
@@ -162,7 +209,6 @@ public class MasterStockRunner implements CommandLineRunner {
      * 업종코드(IndustryCode) 데이터 로드
      */
     private void loadIndustryCodeData(Map<String, String> map, String classpathLocation) {
-
         Resource resource = new ClassPathResource(classpathLocation);
 
         if (!resource.exists()) {

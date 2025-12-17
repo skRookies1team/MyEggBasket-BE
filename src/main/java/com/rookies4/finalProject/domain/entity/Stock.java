@@ -32,6 +32,9 @@ public class Stock {
     @Column(name = "industry_code", length = 20)
     private String industryCode; // 업종코드
 
+    @Column(name = "corp_code", length = 8, unique = true)
+    private String corpCode; // 법인고유번호 (DART용 8자리)
+
     // 보유 내역
     @OneToMany(mappedBy = "stock", cascade = CascadeType.ALL, orphanRemoval = true)
     @Builder.Default
@@ -66,6 +69,7 @@ public class Stock {
     @OneToMany(mappedBy = "stock", cascade = CascadeType.ALL, orphanRemoval = true)
     @Builder.Default
     private List<InterestStock> interestedUsers = new ArrayList<>();
+
 
     // 연관관계 편의 메서드
     public void addOutgoingRelation(StockRelation relation) {
