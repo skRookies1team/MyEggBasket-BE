@@ -5,7 +5,7 @@ import com.rookies4.finalProject.dto.UserDTO;
 import com.rookies4.finalProject.exception.BusinessException;
 import com.rookies4.finalProject.exception.ErrorCode;
 import com.rookies4.finalProject.repository.UserRepository;
-import com.rookies4.finalProject.util.EncryptionUtil; // EncryptionUtil 임포트
+import com.rookies4.finalProject.util.EncryptionUtil;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
@@ -17,6 +17,7 @@ import org.springframework.transaction.annotation.Transactional;
 public class UserService {
     private final UserRepository userRepository;
     private final PasswordEncoder passwordEncoder;
+    private final EncryptionUtil encryptionUtil;
 
     // --- 1. Create User (회원가입) ---
     @Transactional
@@ -32,8 +33,8 @@ public class UserService {
         String encodedPassword = passwordEncoder.encode(request.getPassword());
 
         // AES-256으로 암호화하여 저장
-        String encryptedAppkey = EncryptionUtil.encrypt(request.getAppkey());
-        String encryptedAppsecret = EncryptionUtil.encrypt(request.getAppsecret());
+        String encryptedAppkey = encryptionUtil.encrypt(request.getAppkey());
+        String encryptedAppsecret = encryptionUtil.encrypt(request.getAppsecret());
 
         User user = User.builder()
                 .email(request.getEmail())
@@ -77,10 +78,10 @@ public class UserService {
             user.setUsername(request.getUsername());
         }
         if (request.getAppkey() != null) {
-            user.setAppkey(EncryptionUtil.encrypt(request.getAppkey()));
+            user.setAppkey(encryptionUtil.encrypt(request.getAppkey()));
         }
         if (request.getAppsecret() != null) {
-            user.setAppsecret(EncryptionUtil.encrypt(request.getAppsecret()));
+            user.setAppsecret(encryptionUtil.encrypt(request.getAppsecret()));
         }
         if(request.getPassword() != null && passwordEncoder.matches(request.getPassword(), user.getPassword())){
             String encodedPassword = passwordEncoder.encode(request.getNewPassword());

@@ -1,5 +1,6 @@
 package com.rookies4.finalProject.domain.entity;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import jakarta.persistence.*;
 import jakarta.validation.constraints.Email;
 import lombok.AllArgsConstructor;
@@ -38,14 +39,17 @@ public class User {
     // password(VARCHAR(255) NOT NULL)에 매핑
     // 비밀번호
     @Column(name = "password", nullable = false, length = 255)
+    @JsonIgnore // JSON 변환 시 제외
     private String password;
 
     // appkey(VARCHAR(500))에 매핑 - 증권사 API Key (암호화 필수)
     @Column(name = "appkey", length = 500)
+    @JsonIgnore // JSON 변환 시 제외
     private String appkey;
 
     // appsecret(VARCHAR(500))에 매핑 - 증권사 API Secret (암호화 필수)
     @Column(name = "appsecret", length = 500)
+    @JsonIgnore // JSON 변환 시 제외
     private String appsecret;
 
     @Column(name="account", length = 8)

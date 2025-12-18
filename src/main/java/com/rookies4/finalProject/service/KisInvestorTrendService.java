@@ -1,26 +1,17 @@
 package com.rookies4.finalProject.service;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.rookies4.finalProject.config.KisApiConfig;
+import com.rookies4.finalProject.component.KisApiClient;
 import com.rookies4.finalProject.domain.entity.Stock;
-import com.rookies4.finalProject.domain.entity.User;
-import com.rookies4.finalProject.dto.KisAuthTokenDTO;
+import com.rookies4.finalProject.dto.KisApiRequest;
 import com.rookies4.finalProject.dto.KisInvestorTrendDTO;
 import com.rookies4.finalProject.exception.BusinessException;
 import com.rookies4.finalProject.exception.ErrorCode;
 import com.rookies4.finalProject.repository.StockRepository;
-import com.rookies4.finalProject.repository.UserRepository;
-import com.rookies4.finalProject.util.EncryptionUtil; // EncryptionUtil 임포트
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.http.*;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import org.springframework.web.client.RestClientException;
-import org.springframework.web.client.RestTemplate;
-import org.springframework.web.util.UriComponentsBuilder;
 
-import java.net.URI;
 import java.time.LocalTime;
 import java.util.ArrayList;
 import java.util.List;
@@ -32,47 +23,25 @@ import java.util.Objects;
 @Transactional(readOnly = true)
 public class KisInvestorTrendService {
 
-    private final RestTemplate restTemplate;
-    private final UserRepository userRepository;
+    private final KisApiClient kisApiClient;
     private final StockRepository stockRepository;
-    private final KisAuthService kisAuthService;
-    private final ObjectMapper objectMapper;
 
     public KisInvestorTrendDTO.InvestorTrendResponse getInvestorTrend(String stockCode, Long userId) {
-        User user = userRepository.findById(userId)
-                .orElseThrow(() -> new BusinessException(ErrorCode.USER_NOT_FOUND));
-        KisAuthTokenDTO.KisTokenResponse tokenResponse = kisAuthService.issueToken(false, user);
-        String accessToken = tokenResponse.getAccessToken();
+        KisApiRequest request = KisApiRequest.builder()
+                .path("/uapi/domestic-stock/v1/quotations/inquire-investor")
+                .trId("FHKST01010900")
+                .param("FID_COND_MRKT_DIV_CODE", "J")
+                .param("FID_INPUT_ISCD", stockCode)
+                .useVirtualServer(false)
+                .build();
 
-        String path = "/uapi/domestic-stock/v1/quotations/inquire-investor";
-        URI uri = KisApiConfig.uri(false, path);
+        KisInvestorTrendDTO.KisApiResponse body = 
+            kisApiClient.get(userId, request, KisInvestorTrendDTO.KisApiResponse.class);
 
-        UriComponentsBuilder builder = UriComponentsBuilder.fromUri(uri)
-                .queryParam("FID_COND_MRKT_DIV_CODE", "J")
-                .queryParam("FID_INPUT_ISCD", stockCode);
-
-        HttpHeaders headers = new HttpHeaders();
-        headers.set("authorization", "Bearer " + accessToken);
-        headers.set("appkey", EncryptionUtil.decrypt(user.getAppkey())); // 복호화 사용
-        headers.set("appsecret", EncryptionUtil.decrypt(user.getAppsecret())); // 복호화 사용
-        headers.set("tr_id", "FHKST01010900");
-        headers.setContentType(MediaType.APPLICATION_JSON);
-
-        HttpEntity<Void> requestEntity = new HttpEntity<>(headers);
-
-        try {
-            ResponseEntity<KisInvestorTrendDTO.KisApiResponse> response = restTemplate.exchange(
-                    builder.toUriString(),
-                    HttpMethod.GET,
-                    requestEntity,
-                    KisInvestorTrendDTO.KisApiResponse.class
-            );
-
-            KisInvestorTrendDTO.KisApiResponse body = response.getBody();
-            if (body == null || !"0".equals(body.getRtCd()) || body.getOutput() == null || body.getOutput().isEmpty()) {
-                String msg = body != null ? body.getMsg1() : "응답이 없습니다.";
-                throw new BusinessException(ErrorCode.KIS_API_ERROR, "투자자 동향 조회 실패: " + msg);
-            }
+        if (body == null || !"0".equals(body.getRtCd()) || body.getOutput() == null || body.getOutput().isEmpty()) {
+            String msg = body != null ? body.getMsg1() : "응답이 없습니다.";
+            throw new BusinessException(ErrorCode.KIS_API_ERROR, "투자자 동향 조회 실패: " + msg);
+        }
 
             List<KisInvestorTrendDTO.KisOutput> outputList = body.getOutput();
             KisInvestorTrendDTO.KisOutput targetOutput;
@@ -112,10 +81,6 @@ public class KisInvestorTrendService {
                     .changeSign(targetOutput.getChangeSign())
                     .investors(investors)
                     .build();
-
-        } catch (RestClientException e) {
-            throw new BusinessException(ErrorCode.KIS_API_ERROR, "KIS API 호출 실패: " + e.getMessage());
-        }
     }
 
     public List<KisInvestorTrendDTO.InvestorTrendResponse>
