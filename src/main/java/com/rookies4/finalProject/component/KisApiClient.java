@@ -33,7 +33,7 @@ import java.util.Map;
 @Component
 @RequiredArgsConstructor
 public class KisApiClient {
-    
+
     private final RestTemplate restTemplate;
     private final KisAuthService kisAuthService;
     private final UserRepository userRepository;
@@ -48,7 +48,7 @@ public class KisApiClient {
         String accessToken = getAccessToken(user, request.isUseVirtualServer());
         HttpHeaders headers = buildHeaders(user, accessToken, request.getTrId());
         URI uri = buildUri(request.getPath(), request.getQueryParams(), request.isUseVirtualServer());
-        
+
         return executeWithRetry(uri, HttpMethod.GET, headers, null, responseType);
     }
 
@@ -60,7 +60,7 @@ public class KisApiClient {
         String accessToken = getAccessToken(user, request.isUseVirtualServer());
         HttpHeaders headers = buildHeaders(user, accessToken, request.getTrId());
         URI uri = buildUri(request.getPath(), request.getQueryParams(), request.isUseVirtualServer());
-        
+
         return executeWithRetry(uri, HttpMethod.POST, headers, request.getBody(), responseType);
     }
 
@@ -68,15 +68,15 @@ public class KisApiClient {
      * Retry 로직이 적용된 실행 메서드
      */
     @Retryable(
-        retryFor = {RestClientException.class},
-        maxAttempts = 3,
-        backoff = @Backoff(delay = 1000, multiplier = 2)
+            retryFor = {RestClientException.class},
+            maxAttempts = 3,
+            backoff = @Backoff(delay = 1000, multiplier = 2)
     )
-    private <T> T executeWithRetry(URI uri, HttpMethod method, HttpHeaders headers, 
-                                    Object body, Class<T> responseType) {
+    private <T> T executeWithRetry(URI uri, HttpMethod method, HttpHeaders headers,
+                                   Object body, Class<T> responseType) {
         try {
             HttpEntity<?> entity = new HttpEntity<>(body, headers);
-            
+
             log.debug("KIS API 호출: {} {}", method, uri);
             if (body != null) {
                 try {
@@ -85,36 +85,36 @@ public class KisApiClient {
                     log.debug("Request Body masking failed: {}", e.getMessage());
                 }
             }
-            
+
             ResponseEntity<T> response = restTemplate.exchange(
-                uri.toString(), 
-                method, 
-                entity, 
-                responseType
+                    uri.toString(),
+                    method,
+                    entity,
+                    responseType
             );
-            
+
             if (response.getBody() == null) {
                 throw new BusinessException(
-                    ErrorCode.KIS_API_ERROR, 
-                    "KIS API 응답이 없습니다"
+                        ErrorCode.KIS_API_ERROR,
+                        "KIS API 응답이 없습니다"
                 );
             }
-            
+
             return response.getBody();
-            
+
         } catch (RestClientResponseException e) {
             String errorBody = secureLogger.maskSensitive(e.getResponseBodyAsString());
             log.error("KIS API 실패 [{}]: {}", e.getStatusCode(), errorBody);
-            
+
             throw new BusinessException(
-                ErrorCode.KIS_API_ERROR, 
-                parseKisErrorMessage(e)
+                    ErrorCode.KIS_API_ERROR,
+                    parseKisErrorMessage(e)
             );
         } catch (RestClientException e) {
             log.error("KIS API 호출 중 네트워크 오류: {}", e.getMessage(), e);
             throw new BusinessException(
-                ErrorCode.KIS_API_ERROR,
-                "KIS API 호출 실패: " + e.getMessage()
+                    ErrorCode.KIS_API_ERROR,
+                    "KIS API 호출 실패: " + e.getMessage()
             );
         }
     }
@@ -127,18 +127,18 @@ public class KisApiClient {
             throw new BusinessException(ErrorCode.VALIDATION_ERROR, "사용자 ID가 null입니다.");
         }
         return userRepository.findById(userId)
-            .orElseThrow(() -> new BusinessException(
-                ErrorCode.USER_NOT_FOUND, 
-                "사용자를 찾을 수 없습니다."
-            ));
+                .orElseThrow(() -> new BusinessException(
+                        ErrorCode.USER_NOT_FOUND,
+                        "사용자를 찾을 수 없습니다."
+                ));
     }
 
     /**
      * Access Token 조회
      */
     private String getAccessToken(User user, boolean useVirtualServer) {
-        KisAuthTokenDTO.KisTokenResponse tokenResponse = 
-            kisAuthService.issueToken(useVirtualServer, user);
+        KisAuthTokenDTO.KisTokenResponse tokenResponse =
+                kisAuthService.issueToken(useVirtualServer, user);
         return tokenResponse.getAccessToken();
     }
 
@@ -169,7 +169,7 @@ public class KisApiClient {
         headers.set("appsecret", appsecret);
         headers.set("tr_id", trId);
         headers.setContentType(MediaType.APPLICATION_JSON);
-        
+
         return headers;
     }
 
@@ -181,13 +181,13 @@ public class KisApiClient {
         if (baseUri == null) {
             throw new BusinessException(ErrorCode.INTERNAL_SERVER_ERROR, "KIS API URI 생성 실패");
         }
-        
+
         UriComponentsBuilder builder = UriComponentsBuilder.fromUri(baseUri);
-        
+
         if (queryParams != null && !queryParams.isEmpty()) {
             queryParams.forEach(builder::queryParam);
         }
-        
+
         return builder.build().toUri();
     }
 
