@@ -1,0 +1,192 @@
+<!doctype html>
+<html>
+<head>
+    <meta charset="utf-8" />
+    <title>STOMP Realtime Test</title>
+    <script src="https://cdn.jsdelivr.net/npm/@stomp/stompjs@7.0.0/bundles/stomp.umd.min.js"></script>
+    <style>
+        body { font-family: sans-serif; padding: 16px; }
+        input { width: 120px; }
+        button { margin-right: 6px; }
+        pre { background: #111; color: #0f0; padding: 12px; height: 360px; overflow: auto; }
+        .row { margin-bottom: 10px; }
+        label { margin-right: 10px; }
+    </style>
+</head>
+<body>
+
+<h3>Realtime STOMP Test</h3>
+
+<div class="row">
+    StockCode:
+    <input id="code" value="005930" />
+
+    Scope:
+    <select id="scope">
+        <option value="persistent">persistent (메인)</option>
+        <option value="page">page (상세)</option>
+    </select>
+
+    Virtual:
+    <select id="virtual">
+        <option value="false">false (실서버)</option>
+        <option value="true">true (모의서버)</option>
+    </select>
+
+    <button onclick="connect()">connect</button>
+    <button onclick="subscribe()">subscribe</button>
+    <button onclick="unsubscribe()">unsubscribe</button>
+    <button onclick="showSubs()">show subs</button>
+    <button onclick="disconnect()">disconnect</button>
+</div>
+
+<div class="row">
+    <button onclick="subscribeMany(['005930','000660'])">quick subscribe 2</button>
+    <button onclick="subscribeMany(['005930','000660','005380'])">quick subscribe 3</button>
+    <button onclick="unsubscribeAll()">unsubscribe all</button>
+    <button onclick="clearLog()">clear log</button>
+</div>
+
+<pre id="log"></pre>
+
+<script>
+    let client;
+
+    // stockCode -> { sub, scope, virtual, dest }
+    const subs = {};
+
+    const logEl = document.getElementById("log");
+    const log = (m) => {
+      logEl.textContent += `[${new Date().toLocaleTimeString()}] ${m}\n`;
+      logEl.scrollTop = logEl.scrollHeight;
+    };
+
+    function clearLog() {
+      logEl.textContent = "";
+    }
+
+    function connect() {
+      if (client?.active || client?.connected) {
+        log("⚠ already connecting/connected");
+        return;
+      }
+
+      client = new StompJs.Client({
+        brokerURL: "ws://localhost:8081/ws",
+        reconnectDelay: 0,
+        debug: msg => log("[STOMP] " + msg),
+        onConnect: () => log("✅ CONNECTED"),
+        onStompError: f => log("❌ STOMP ERROR " + (f?.body ?? "")),
+        onWebSocketError: e => log("❌ WS ERROR " + (e?.message ?? e)),
+        onDisconnect: () => log("🔌 onDisconnect")
+      });
+
+      client.activate();
+    }
+
+    function subscribe() {
+      if (!client?.connected) {
+        log("❌ not connected");
+        return;
+      }
+
+      const code = document.getElementById("code").value.trim();
+      if (!code) {
+        log("❌ stockCode empty");
+        return;
+      }
+
+      if (subs[code]) {
+        log("⚠ already subscribed " + code);
+        return;
+      }
+
+      const scope = document.getElementById("scope").value;
+      const virtual = document.getElementById("virtual").value; // "true"/"false"
+      const dest = `/topic/realtime-price/${code}`;
+
+      const headers = {
+        scope,
+        virtual
+        // useVirtualServer: virtual, // 필요하면 이걸로도 보낼 수 있음
+      };
+
+      const sub = client.subscribe(
+        dest,
+        msg => log(`📩 [${code}] ${msg.body}`),
+        headers
+      );
+
+      subs[code] = { sub, scope, virtual, dest };
+      log(`✅ SUBSCRIBE ${code} (scope=${scope}, virtual=${virtual})`);
+    }
+
+    function unsubscribe() {
+      const code = document.getElementById("code").value.trim();
+      if (!code) {
+        log("❌ stockCode empty");
+        return;
+      }
+
+      const item = subs[code];
+      if (!item) {
+        log("⚠ no subscription for " + code);
+        return;
+      }
+
+      item.sub.unsubscribe();
+      delete subs[code];
+      log(`✅ UNSUBSCRIBE ${code}`);
+    }
+
+    function unsubscribeAll() {
+      const codes = Object.keys(subs);
+      if (codes.length === 0) {
+        log("⚠ no subscriptions");
+        return;
+      }
+
+      codes.forEach(code => {
+        try { subs[code].sub.unsubscribe(); } catch (_) {}
+        delete subs[code];
+      });
+
+      log(`✅ UNSUBSCRIBE ALL (${codes.length})`);
+    }
+
+    function showSubs() {
+      const list = Object.keys(subs);
+      log("📌 subscribed codes = " + (list.length ? list.join(", ") : "(none)"));
+
+      // 상세 정보도 보고 싶으면 아래 주석 해제
+      // list.forEach(code => {
+      //   const s = subs[code];
+      //   log(`   - ${code}: scope=${s.scope}, virtual=${s.virtual}, dest=${s.dest}`);
+      // });
+    }
+
+    function disconnect() {
+      try {
+        unsubscribeAll();
+        if (client) client.deactivate();
+      } finally {
+        log("🔌 DISCONNECTED (deactivate called)");
+      }
+    }
+
+    function subscribeMany(codes) {
+      if (!client?.connected) {
+        log("❌ not connected");
+        return;
+      }
+      if (!Array.isArray(codes)) return;
+
+      codes.forEach(c => {
+        document.getElementById("code").value = c;
+        subscribe();
+      });
+    }
+</script>
+
+</body>
+</html>
