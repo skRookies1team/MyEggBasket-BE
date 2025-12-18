@@ -31,7 +31,7 @@ public class KisVolumeRankService {
      */
     public List<VolumeRankResponseDTO> getVolumeRank(User user) {
         log.info("KIS 거래량 순위 조회 요청: userId={}", user.getId());
-        
+
         // KisApiClient를 사용한 간결한 API 호출
         KisApiRequest request = KisApiRequest.builder()
                 .path("/uapi/domestic-stock/v1/quotations/volume-rank")
@@ -49,10 +49,10 @@ public class KisVolumeRankService {
                 .param("FID_INPUT_DATE_1", "")
                 .useVirtualServer(false)
                 .build();
-        
-        KisVolumeRankDTO.KisVolumeRankResponse body = 
+
+        KisVolumeRankDTO.KisVolumeRankResponse body =
             kisApiClient.get(user.getId(), request, KisVolumeRankDTO.KisVolumeRankResponse.class);
-        
+
         if (body == null || body.getOutput() == null) {
             throw new BusinessException(
                 ErrorCode.KIS_API_ERROR,

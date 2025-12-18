@@ -8,16 +8,15 @@ import com.rookies4.finalProject.dto.KisAuthTokenDTO;
 import com.rookies4.finalProject.dto.KisBalanceDTO;
 import com.rookies4.finalProject.exception.BusinessException;
 import com.rookies4.finalProject.exception.ErrorCode;
-import com.rookies4.finalProject.repository.HoldingRepository;
 import com.rookies4.finalProject.repository.PortfolioRepository;
 import com.rookies4.finalProject.repository.StockRepository;
 import com.rookies4.finalProject.repository.UserRepository;
 import java.math.BigDecimal;
-import java.util.HashMap;
-import java.util.HashSet;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
+import java.util.function.Function;
+import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -33,119 +32,17 @@ public class BalanceSyncService {
 
     private final UserRepository userRepository;
     private final PortfolioRepository portfolioRepository;
-    private final HoldingRepository holdingRepository;
     private final StockRepository stockRepository;
 
     private final KisAuthService kisAuthService;
     private final KisBalanceService kisBalanceService;
 
     /**
-     * KIS 잔고 기준으로 우리 DB(Portfolio/Holding) 동기화
-     */
-    @Transactional
-    public void syncFromKis(Long userId, KisBalanceDTO kisBalance, boolean useVirtual) {
-
-        User user = userRepository.findById(userId)
-                .orElseThrow(() -> new BusinessException(
-                        ErrorCode.USER_NOT_FOUND,
-                        "사용자를 찾을 수 없습니다. userId=" + userId
-                ));
-
-        // 1. 이 유저의 "KIS용 포트폴리오" 찾거나 생성
-        Portfolio portfolio = findOrCreateKisPortfolio(user, useVirtual);
-
-        // 2. 기존 Holding 을 stockCode 기준으로 맵핑
-        List<Holding> existingHoldings = holdingRepository.findByPortfolio(portfolio);
-        Map<String, Holding> holdingMap = new HashMap<>();
-        for (Holding h : existingHoldings) {
-            if (h.getStock() != null && h.getStock().getStockCode() != null) {
-                holdingMap.put(h.getStock().getStockCode(), h);
-            }
-        }
-
-        // 이번 KIS 응답에 등장한 종목들
-        Set<String> seenStockCodes = new HashSet<>();
-
-        List<KisBalanceDTO.KisBalanceDetail> details = kisBalance.getOutput1();
-        if (details == null || details.isEmpty()) {
-            log.info("[BALANCE_SYNC] KIS 잔고에 보유 종목이 없습니다. userId={}", userId);
-        } else {
-            for (KisBalanceDTO.KisBalanceDetail d : details) {
-                String stockCode = d.getPdno();
-                if (stockCode == null || stockCode.isBlank()) {
-                    log.warn("[BALANCE_SYNC] 종목코드(pdno) 없음, 레코드 무시: {}", d);
-                    continue;
-                }
-                seenStockCodes.add(stockCode);
-
-                Integer quantity = toInteger(d.getHldgQty());
-                BigDecimal avgPrice = toBigDecimal(d.getPchsAvgPric());
-
-                // 0주면 보유하지 않는 것으로 보고 건너뛰는 정책
-                if (quantity == null || quantity <= 0) {
-                    continue;
-                }
-
-                // Stock upsert
-                Stock stock = stockRepository.findByStockCode(stockCode)
-                        .map(existing -> {
-                            if (d.getPrdtName() != null && !d.getPrdtName().isBlank()) {
-                                existing.setName(d.getPrdtName());
-                            }
-                            return existing;
-                        })
-                        .orElseGet(() -> {
-                            Stock s = new Stock();
-                            s.setStockCode(stockCode);
-                            s.setName(d.getPrdtName() != null ? d.getPrdtName() : "");
-                            return stockRepository.save(s);
-                        });
-
-                // Holding upsert
-                Holding holding = holdingMap.get(stockCode);
-                if (holding == null) {
-                    holding = new Holding();
-                    holding.setPortfolio(portfolio);
-                    holding.setStock(stock);
-                }
-
-                holding.setQuantity(quantity);   // Holding.quantity = Integer
-                holding.setAvgPrice(avgPrice);   // Holding.avgPrice = BigDecimal
-
-                holdingRepository.save(holding);
-                holdingMap.put(stockCode, holding);
-            }
-        }
-
-        // 3. KIS 응답에 더 이상 없는 종목 정리 (정책: 삭제)
-        for (Holding h : existingHoldings) {
-            String code = (h.getStock() != null) ? h.getStock().getStockCode() : null;
-            if (code == null) continue;
-            if (!seenStockCodes.contains(code)) {
-                holdingRepository.delete(h);
-            }
-        }
-
-        // 4. 포트폴리오 요약 값도 KIS summary 기반으로 업데이트
-        List<KisBalanceDTO.OutputSummary> summaries = kisBalance.getOutput2();
-        if (summaries != null && !summaries.isEmpty()) {
-            KisBalanceDTO.OutputSummary s = summaries.get(0);
-            portfolio.setTotalAsset(toBigDecimal(s.getTotEvluAmt()));   // 총평가금액
-            portfolio.setCashBalance(toBigDecimal(s.getDncaTotAmt()));   // 예수금
-            portfolioRepository.save(portfolio);
-        }
-
-        log.info("[BALANCE_SYNC] 잔고 동기화 완료: userId={}, portfolioId={}",
-                userId, portfolio.getPortfolioId());
-    }
-
-    /**
      * KIS 잔고 조회 + DB 동기화 + 원본 KIS 응답 반환
-     * - TransactionSyncService.syncUserOrdersFromKis 와 대칭 역할
      */
     @Transactional
     public KisBalanceDTO syncAndGetFromKis(User user, boolean useVirtual) {
-
+        // 1. 토큰 발급
         KisAuthTokenDTO.KisTokenResponse tokenResponse =
                 kisAuthService.issueToken(useVirtual, user);
 
@@ -162,16 +59,125 @@ public class BalanceSyncService {
             return null;
         }
 
-        // 4. DB 동기화
+        // 4. DB 동기화 실행
         syncFromKis(user.getId(), kisBalance, useVirtual);
 
-        // 5. BalanceService 에서 DTO 매핑에 쓰도록 원본 리턴
         return kisBalance;
+    }
+
+    /**
+     * KIS 잔고 기준으로 우리 DB(Portfolio/Holding) 동기화
+     * - orphanRemoval=true를 활용하여 리스트에서 제거 시 DB 삭제 유도
+     * - 타입 불일치 해결 (Integer, Float)
+     */
+    @Transactional
+    public void syncFromKis(Long userId, KisBalanceDTO kisBalance, boolean useVirtual) {
+
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new BusinessException(
+                        ErrorCode.USER_NOT_FOUND,
+                        "사용자를 찾을 수 없습니다. userId=" + userId
+                ));
+
+        // 1. 포트폴리오 찾기 또는 생성
+        Portfolio portfolio = findOrCreateKisPortfolio(user, useVirtual);
+
+        // KIS에서 응답받은 보유 종목 리스트
+        List<KisBalanceDTO.KisBalanceDetail> details = kisBalance.getOutput1();
+        if (details == null) details = new ArrayList<>();
+
+        // KIS 응답 데이터를 Map으로 변환 (검색 속도 향상)
+        Map<String, KisBalanceDTO.KisBalanceDetail> kisMap = details.stream()
+                .filter(d -> d.getPdno() != null && !d.getPdno().isBlank())
+                .collect(Collectors.toMap(
+                        KisBalanceDTO.KisBalanceDetail::getPdno,
+                        Function.identity(),
+                        (existing, replacement) -> existing
+                ));
+
+        // 2. [삭제] DB 포트폴리오에는 있지만 KIS 잔고에는 없는 종목 제거
+        List<Holding> holdings = portfolio.getHoldings();
+        holdings.removeIf(h -> {
+            String code = (h.getStock() != null) ? h.getStock().getStockCode() : null;
+            // 코드가 없거나, KIS 응답 맵에 없으면 삭제 대상
+            boolean toDelete = code == null || !kisMap.containsKey(code);
+            if (toDelete) {
+                log.info("[BALANCE_SYNC] 보유 종목 삭제: code={}", code);
+            }
+            return toDelete;
+        });
+
+        // 3. [추가/수정] KIS 정보를 바탕으로 DB 업데이트
+        for (KisBalanceDTO.KisBalanceDetail d : details) {
+            String stockCode = d.getPdno();
+            if (stockCode == null || stockCode.isBlank()) continue;
+
+            // [수정] Entity 타입(Integer)에 맞춰 변환
+            Integer quantity = toInteger(d.getHldgQty());
+            BigDecimal avgPrice = toBigDecimal(d.getPchsAvgPric());
+
+            // 수량이 0 이하면 보유하지 않은 것으로 간주
+            if (quantity <= 0) continue;
+
+            // 3-1. Stock 엔티티 확인 (없으면 생성)
+            Stock stock = stockRepository.findByStockCode(stockCode)
+                    .map(existing -> {
+                        if (d.getPrdtName() != null && !d.getPrdtName().isBlank()) {
+                            existing.setName(d.getPrdtName());
+                        }
+                        return existing;
+                    })
+                    .orElseGet(() -> {
+                        Stock s = new Stock();
+                        s.setStockCode(stockCode);
+                        s.setName(d.getPrdtName() != null ? d.getPrdtName() : "Unknown");
+                        return stockRepository.save(s);
+                    });
+
+            // 3-2. 현재 Holding 리스트에서 해당 종목 찾기
+            Holding holding = holdings.stream()
+                    .filter(h -> h.getStock() != null && stockCode.equals(h.getStock().getStockCode()))
+                    .findFirst()
+                    .orElse(null);
+
+            if (holding == null) {
+                // 신규 추가
+                holding = Holding.builder()
+                        .portfolio(portfolio)
+                        .stock(stock)
+                        // .stockCode(stockCode) -> 삭제됨 (Entity에 없는 필드)
+                        .quantity(quantity)              // Integer 타입
+                        .avgPrice(avgPrice)              // BigDecimal 타입
+                        .currentWeight(0.0f)             // Float 타입 초기화
+                        .targetWeight(0.0f)              // Float 타입 초기화
+                        .build();
+                holdings.add(holding);
+            } else {
+                // 기존 정보 업데이트
+                holding.setQuantity(quantity);
+                holding.setAvgPrice(avgPrice);
+            }
+        }
+
+        // 4. 포트폴리오 메타데이터(예수금 등) 업데이트
+        List<KisBalanceDTO.OutputSummary> summaries = kisBalance.getOutput2();
+        if (summaries != null && !summaries.isEmpty()) {
+            KisBalanceDTO.OutputSummary s = summaries.get(0);
+            portfolio.setTotalAsset(toBigDecimal(s.getTotEvluAmt()));   // 총평가금액
+            portfolio.setCashBalance(toBigDecimal(s.getDncaTotAmt()));   // 예수금
+        }
+
+        // 5. 최종 저장
+        portfolioRepository.save(portfolio);
+
+        log.info("[BALANCE_SYNC] 잔고 동기화 완료: userId={}, portfolioId={}, 종목수={}",
+                userId, portfolio.getPortfolioId(), portfolio.getHoldings().size());
     }
 
     private Portfolio findOrCreateKisPortfolio(User user, boolean useVirtual) {
         String name = useVirtual ? VIRTUAL_PORTFOLIO_NAME : REAL_PORTFOLIO_NAME;
 
+        // Repository가 List를 반환한다고 가정하고 처리
         return portfolioRepository.findByUser(user).stream()
                 .filter(p -> name.equals(p.getName()))
                 .findFirst()
@@ -179,6 +185,8 @@ public class BalanceSyncService {
                     Portfolio p = new Portfolio();
                     p.setUser(user);
                     p.setName(name);
+                    p.setTotalAsset(BigDecimal.ZERO);
+                    p.setCashBalance(BigDecimal.ZERO);
                     return portfolioRepository.save(p);
                 });
     }
@@ -188,7 +196,6 @@ public class BalanceSyncService {
         try {
             return new BigDecimal(value.trim());
         } catch (NumberFormatException e) {
-            log.warn("[BALANCE_SYNC] BigDecimal 변환 실패 value={}", value);
             return BigDecimal.ZERO;
         }
     }
@@ -198,7 +205,6 @@ public class BalanceSyncService {
         try {
             return Integer.parseInt(value.trim());
         } catch (NumberFormatException e) {
-            log.warn("[BALANCE_SYNC] Integer 변환 실패 value={}", value);
             return 0;
         }
     }

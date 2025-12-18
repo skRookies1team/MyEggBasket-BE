@@ -27,7 +27,7 @@ public class KisKoreaIndexService {
                 .useVirtualServer(false)
                 .build();
 
-        KisKoreaIndexDTO.KisKoreaIndexResponse response = 
+        KisKoreaIndexDTO.KisKoreaIndexResponse response =
             kisApiClient.get(userId, request, KisKoreaIndexDTO.KisKoreaIndexResponse.class);
 
         if (response == null || !"0".equals(response.getRtCd())) {
