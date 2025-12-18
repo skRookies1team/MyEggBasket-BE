@@ -20,11 +20,12 @@ public class KisForeignIndexService {
 
     public KisForeignIndexDTO.KisForeignIndexResponse getForeignIndex(String indexCode, Long userId) {
         KisApiRequest request = KisApiRequest.builder()
-                .path("/uapi/overseas-price/v1/quotations/price")
-                .trId("HHDFS00000300")
-                .param("AUTH", "")
-                .param("EXCD", getExchangeCode(indexCode))
-                .param("SYMB", indexCode)
+                .path("/uapi/overseas-price/v1/quotations/inquire-time-indexchartprice")
+                .trId("FHKST03030200")
+                .param("FID_COND_MRKT_DIV_CODE", "N")
+                .param("FID_INPUT_ISCD", indexCode)
+                .param("FID_HOUR_CLS_CODE", "0")
+                .param("FID_PW_DATA_INCU_YN", "Y")
                 .useVirtualServer(false)
                 .build();
 
@@ -37,21 +38,5 @@ public class KisForeignIndexService {
         }
 
         return response;
-    }
-
-    private String getExchangeCode(String indexCode) {
-        // 해외 지수별 거래소 코드 매핑
-        switch (indexCode) {
-            case "DJI":
-            case "NAS":
-            case "SPI":
-                return "NYS"; // 미국
-            case "NII":
-                return "TSE"; // 일본
-            case "HSI":
-                return "HKS"; // 홍콩
-            default:
-                throw new BusinessException(ErrorCode.VALIDATION_ERROR, "지원하지 않는 해외 지수 코드입니다.");
-        }
     }
 }

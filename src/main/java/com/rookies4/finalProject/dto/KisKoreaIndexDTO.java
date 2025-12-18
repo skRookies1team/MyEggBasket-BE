@@ -22,7 +22,7 @@ public class KisKoreaIndexDTO {
         @JsonProperty("msg1")
         private String msg1;    // 응답메세지 (필수)
         @JsonProperty("output")
-        private List<KisKoreaIndexDTO.ResponseOutput> output;
+        private KisKoreaIndexDTO.ResponseOutput output;
 
     }
 
@@ -46,6 +46,7 @@ public class KisKoreaIndexDTO {
 
         @JsonProperty("acml_vol")
         private String tradingVolume;
+
     }
 
     @Data
