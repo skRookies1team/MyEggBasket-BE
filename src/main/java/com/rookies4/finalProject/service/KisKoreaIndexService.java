@@ -21,8 +21,8 @@ public class KisKoreaIndexService {
     public KisKoreaIndexDTO.KisKoreaIndexResponse getKoreaIndex(String indexCode, Long userId) {
         KisApiRequest request = KisApiRequest.builder()
                 .path("/uapi/domestic-stock/v1/quotations/inquire-index-price")
-                .trId("FHPUP01700000")
-                .param("FID_COND_MRKT_DIV_CODE", "J")
+                .trId("FHPUP02100000")
+                .param("FID_COND_MRKT_DIV_CODE", "U")
                 .param("FID_INPUT_ISCD", indexCode)
                 .useVirtualServer(false)
                 .build();
