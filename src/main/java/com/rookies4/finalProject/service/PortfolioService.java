@@ -60,6 +60,8 @@ public class PortfolioService {
         User user = userRepository.findById(currentUserId)
                 .orElseThrow(() -> new BusinessException(ErrorCode.USER_NOT_FOUND, "로그인한 사용자를 찾을 수 없습니다."));
 
+        // 포트폴리오 목록 조회 (holdings 필요 X)
+        // @BatchSize로 자동 최적화: holdings 접근 시 IN 절로 N+1 방지
         return portfolioRepository.findByUser(user)
                 .stream()
                 .map(PortfolioDTO.PortfolioResponse::fromEntity)
@@ -69,27 +71,12 @@ public class PortfolioService {
     //3. Portfolio 상세 조회
     @Transactional(readOnly = true)
     public PortfolioDTO.PortfolioResponse readPortfolio(Long portfolioId){
-        Portfolio portfolio = portfolioRepository.findById(portfolioId)
+        // N+1 문제 해결: Fetch Join으로 holdings과 stock을 함께 조회
+        Portfolio portfolio = portfolioRepository.findByIdWithHoldings(portfolioId)
                 .orElseThrow(() -> new BusinessException(ErrorCode.PORTFOLIO_NOT_FOUND));
         
         // 권한 확인: 포트폴리오 소유자만 조회 가능
         validatePortfolioOwnership(portfolio);
-
-        if (portfolio.getUser() != null) {
-            portfolio.getUser().getId();
-        }
-        
-        // Holdings 컬렉션 초기화 및 각 Holding의 Stock 초기화
-        // DTO 변환 시 필요하므로 트랜잭션 내에서 초기화
-        if (portfolio.getHoldings() != null && !portfolio.getHoldings().isEmpty()) {
-            portfolio.getHoldings().forEach(holding -> {
-                if (holding.getStock() != null) {
-                    // Stock의 필요한 필드들을 접근하여 초기화
-                    holding.getStock().getStockCode();
-                    holding.getStock().getName();
-                }
-            });
-        }
         
         return PortfolioDTO.PortfolioResponse.fromEntity(portfolio);
     }
@@ -141,7 +128,8 @@ public class PortfolioService {
     //6. 포트폴리오 보유종목 조회
     @Transactional(readOnly = true)
     public PortfolioDTO.PortfolioHoldingResponse readPortfolioHoldings(Long portfolioId) {
-        Portfolio portfolio = portfolioRepository.findById(portfolioId)
+        // N+1 문제 해결: Fetch Join으로 holdings과 stock을 함께 조회
+        Portfolio portfolio = portfolioRepository.findByIdWithHoldings(portfolioId)
                 .orElseThrow(() -> new BusinessException(ErrorCode.PORTFOLIO_NOT_FOUND));
         
         // 권한 확인: 포트폴리오 소유자만 조회 가능

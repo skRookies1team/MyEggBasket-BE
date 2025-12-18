@@ -73,16 +73,8 @@ public class HoldingService {
         // 권한 확인: 포트폴리오 소유자만 조회 가능
         validatePortfolioOwnership(portfolio);
 
-        List<Holding> holdings = holdingRepository.findByPortfolio(portfolio);
-        
-        // LAZY 로딩된 Stock 엔티티들을 트랜잭션 내에서 초기화하여 JSON 직렬화 시 오류 방지
-        holdings.forEach(holding -> {
-            if (holding.getStock() != null) {
-                // Stock의 기본 필드들을 접근하여 초기화
-                holding.getStock().getStockCode();
-                holding.getStock().getName();
-            }
-        });
+        // N+1 문제 해결: Fetch Join으로 stock을 함께 조회
+        List<Holding> holdings = holdingRepository.findByPortfolioWithStock(portfolio);
         
         return holdings.stream()
                 .map(HoldingDTO.HoldingResponse::fromEntity)

@@ -3,6 +3,7 @@ package com.rookies4.finalProject.domain.entity;
 import com.rookies4.finalProject.domain.enums.RiskLevel;
 import jakarta.persistence.*;
 import lombok.*;
+import org.hibernate.annotations.BatchSize;
 
 import java.math.BigDecimal;
 import java.util.ArrayList;
@@ -40,7 +41,9 @@ public class Portfolio {
     private RiskLevel riskLevel;
 
     // 포트폴리오에 속한 보유 종목들
+    // BatchSize를 설정하여 Lazy Loading 시 IN 절로 최적화 (N+1 방지)
     @OneToMany(mappedBy = "portfolio", cascade = CascadeType.ALL, orphanRemoval = true)
+    @BatchSize(size = 10)
     @Builder.Default
     private List<Holding> holdings = new ArrayList<>();
 

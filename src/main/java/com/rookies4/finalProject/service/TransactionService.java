@@ -8,7 +8,6 @@ import com.rookies4.finalProject.exception.BusinessException;
 import com.rookies4.finalProject.exception.ErrorCode;
 import com.rookies4.finalProject.repository.TransactionRepository;
 import com.rookies4.finalProject.repository.UserRepository;
-import com.rookies4.finalProject.security.SecurityUtil;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -56,11 +55,13 @@ public class TransactionService {
 
         List<Transaction> transactions;
         if (statusFilter != null) {
+            // N+1 문제 해결: Fetch Join으로 user를 함께 조회
             transactions = transactionRepository
-                    .findByUser_IdAndStatusOrderByExecutedAtDesc(userId, statusFilter);
+                    .findByUser_IdAndStatusWithFetch(userId, statusFilter);
         } else {
+            // N+1 문제 해결: Fetch Join으로 user를 함께 조회
             transactions = transactionRepository
-                    .findByUser_IdOrderByExecutedAtDesc(userId);
+                    .findByUser_IdWithFetch(userId);
         }
 
         // 4. DTO 변환

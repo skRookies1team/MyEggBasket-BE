@@ -4,6 +4,8 @@ import com.rookies4.finalProject.domain.entity.Transaction;
 import com.rookies4.finalProject.domain.enums.TransactionStatus;
 import java.util.Optional;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
 import java.util.List;
@@ -18,4 +20,18 @@ public interface TransactionRepository extends JpaRepository<Transaction, Long> 
 
     // 3. 사용자 ID와 KIS 주문번호(orderNo)로 거래 내역 찾기
     Optional<Transaction> findByUser_IdAndOrderNo(Long userId, String orderNo);
+
+    // N+1 문제 해결: Fetch Join으로 user를 함께 조회
+    @Query("SELECT t FROM Transaction t " +
+           "JOIN FETCH t.user " +
+           "WHERE t.user.id = :userId AND t.status = :status " +
+           "ORDER BY t.executedAt DESC")
+    List<Transaction> findByUser_IdAndStatusWithFetch(@Param("userId") Long userId, @Param("status") TransactionStatus status);
+
+    // N+1 문제 해결: Fetch Join으로 user를 함께 조회
+    @Query("SELECT t FROM Transaction t " +
+           "JOIN FETCH t.user " +
+           "WHERE t.user.id = :userId " +
+           "ORDER BY t.executedAt DESC")
+    List<Transaction> findByUser_IdWithFetch(@Param("userId") Long userId);
 }

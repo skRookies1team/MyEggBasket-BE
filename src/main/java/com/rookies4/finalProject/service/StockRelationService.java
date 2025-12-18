@@ -44,7 +44,8 @@ public class StockRelationService {
     public List<StockRelationDTO.StockRelationResponse> readFromStockRelation(String stockCode){
         Stock fromStock = stockRepository.findByStockCode(stockCode)
                 .orElseThrow(() -> new BusinessException(ErrorCode.TICKER_NOT_FOUND));
-        return stockRelationRepository.findByFromStock(fromStock)
+        // N+1 문제 해결: Fetch Join으로 fromStock을 함께 조회
+        return stockRelationRepository.findByFromStockWithFetch(fromStock)
                 .stream()
                 .map(StockRelationDTO.StockRelationResponse::fromEntity)
                 .collect(Collectors.toList());
@@ -54,7 +55,8 @@ public class StockRelationService {
     public List<StockRelationDTO.StockRelationResponse> readToStockRelation(String stockCode){
         Stock toStock = stockRepository.findByStockCode(stockCode)
                 .orElseThrow(() -> new BusinessException(ErrorCode.TICKER_NOT_FOUND));
-        return stockRelationRepository.findByToStock(toStock)
+        // N+1 문제 해결: Fetch Join으로 toStock을 함께 조회
+        return stockRelationRepository.findByToStockWithFetch(toStock)
                 .stream()
                 .map(StockRelationDTO.StockRelationResponse::fromEntity)
                 .collect(Collectors.toList());

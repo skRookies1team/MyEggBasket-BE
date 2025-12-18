@@ -27,6 +27,8 @@ public class Holding {
     @JoinColumn(name = "portfolio_id")
     private Portfolio portfolio;
 
+    // @BatchSize는 컬렉션(@OneToMany, @ManyToMany)에만 적용 가능
+    // ManyToOne 관계에는 적용 불가 - Fetch Join 사용
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "stock_code")
     private Stock stock;
