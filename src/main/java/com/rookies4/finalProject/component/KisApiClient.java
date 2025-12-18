@@ -1,5 +1,6 @@
 package com.rookies4.finalProject.component;
 
+import com.fasterxml.jackson.databind.ObjectMapper; // [추가됨] JSON 변환을 위한 ObjectMapper 임포트
 import com.rookies4.finalProject.config.KisApiConfig;
 import com.rookies4.finalProject.domain.entity.User;
 import com.rookies4.finalProject.dto.KisApiRequest;
@@ -39,6 +40,7 @@ public class KisApiClient {
     private final UserRepository userRepository;
     private final EncryptionUtil encryptionUtil;
     private final SecureLogger secureLogger;
+    private final ObjectMapper objectMapper; // [추가됨] JSON 직렬화를 위해 주입
 
     /**
      * KIS API GET 요청
@@ -75,16 +77,30 @@ public class KisApiClient {
     private <T> T executeWithRetry(URI uri, HttpMethod method, HttpHeaders headers,
                                    Object body, Class<T> responseType) {
         try {
-            HttpEntity<?> entity = new HttpEntity<>(body, headers);
-
-            log.debug("KIS API 호출: {} {}", method, uri);
+            // [변경됨] Body를 JSON 문자열로 수동 직렬화
+            String jsonBody = null;
             if (body != null) {
                 try {
-                    log.debug("Request Body: {}", secureLogger.maskSensitiveJson(body));
+                    // 이미 String이면 그대로, 객체면 JSON String으로 변환
+                    if (body instanceof String) {
+                        jsonBody = (String) body;
+                    } else {
+                        jsonBody = objectMapper.writeValueAsString(body);
+                    }
+
+                    // 로깅 (SecureLogger는 String 입력도 처리 가능)
+                    log.debug("Request Body: {}", secureLogger.maskSensitive(jsonBody));
                 } catch (Exception e) {
-                    log.debug("Request Body masking failed: {}", e.getMessage());
+                    log.warn("Request Body parsing failed: {}", e.getMessage());
+                    // 변환 실패 시 toString()이라도 사용 (혹은 예외 던지기)
+                    jsonBody = body.toString();
                 }
             }
+
+            log.debug("KIS API 호출: {} {}", method, uri);
+
+            // [변경됨] HttpEntity에 변환된 String Body를 담음
+            HttpEntity<String> entity = new HttpEntity<>(jsonBody, headers);
 
             ResponseEntity<T> response = restTemplate.exchange(
                     uri.toString(),
