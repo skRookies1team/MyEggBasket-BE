@@ -159,6 +159,47 @@ public class EncryptionUtil {
     }
 
     /**
+     * 암호화 마이그레이션을 지원하는 복호화 메서드
+     * - GCM 모드 우선 시도
+     * - GCM 실패 시 레거시 ECB 모드 시도
+     * - 모든 복호화 방식 실패 시 명확한 예외 발생
+     * 
+     * @param encryptedText 암호화된 문자열 (Base64 인코딩)
+     * @return 복호화된 평문
+     * @throws BusinessException 입력값이 비어있거나 모든 복호화 방식 실패 시
+     */
+    public String decryptAndMigrate(String encryptedText) {
+        // 1. 입력값 유효성 검증
+        if (encryptedText == null || encryptedText.isEmpty()) {
+            throw new BusinessException(
+                ErrorCode.VALIDATION_ERROR,
+                "암호화된 데이터가 없습니다"
+            );
+        }
+        
+        try {
+            // 2. GCM 모드로 복호화 시도
+            return decryptGCM(encryptedText);
+        } catch (Exception gcmEx) {
+            log.warn("GCM 복호화 실패, ECB 시도: {}", gcmEx.getMessage());
+            try {
+                // 3. ECB 모드로 복호화 시도
+                String decrypted = decryptLegacyECB(encryptedText);
+                // 4. 레거시 ECB 데이터 감지 알림
+                log.warn("레거시 ECB 데이터 감지 - 재암호화 필요 (데이터: {}bytes)", encryptedText.length());
+                return decrypted;
+            } catch (Exception ecbEx) {
+                // 5. 모든 복호화 방식 실패
+                log.error("모든 복호화 방식 실패 - GCM: {}, ECB: {}", gcmEx.getMessage(), ecbEx.getMessage(), ecbEx);
+                throw new BusinessException(
+                    ErrorCode.INTERNAL_SERVER_ERROR,
+                    "데이터 복호화에 실패했습니다"
+                );
+            }
+        }
+    }
+
+    /**
      * SECRET_KEY를 32바이트(256비트)로 정규화하여 SecretKeySpec 생성
      * - 32자 미만: SHA-256 해시로 32바이트 생성
      * - 32자 초과: 앞 32바이트만 사용
