@@ -47,23 +47,56 @@ public class KisApiClient {
      */
     public <T> T get(Long userId, KisApiRequest request, Class<T> responseType) {
         User user = getUser(userId);
-        String accessToken = getAccessToken(user, request.isUseVirtualServer());
-        HttpHeaders headers = buildHeaders(user, accessToken, request.getTrId());
-        URI uri = buildUri(request.getPath(), request.getQueryParams(), request.isUseVirtualServer());
-
-        return executeWithRetry(uri, HttpMethod.GET, headers, null, responseType);
+        try {
+            return executeInternal(user, request, responseType, HttpMethod.GET);
+        } catch (BusinessException e) {
+            if (isTokenExpiredError(e)) {
+                log.warn("KIS 토큰 만료 감지 (GET). 토큰 재발급 후 재시도합니다. userId={}", userId);
+                kisAuthService.expireToken(user); // 토큰 만료 처리
+                return executeInternal(user, request, responseType, HttpMethod.GET); // 재시도
+            }
+            throw e;
+        }
     }
 
     /**
-     * KIS API POST 요청
+     * KIS API POST 요청 (재시도 로직 추가)
      */
     public <T> T post(Long userId, KisApiRequest request, Class<T> responseType) {
         User user = getUser(userId);
+        try {
+            return executeInternal(user, request, responseType, HttpMethod.POST);
+        } catch (BusinessException e) {
+            if (isTokenExpiredError(e)) {
+                log.warn("KIS 토큰 만료 감지 (POST). 토큰 재발급 후 재시도합니다. userId={}", userId);
+                kisAuthService.expireToken(user); // 토큰 만료 처리
+                return executeInternal(user, request, responseType, HttpMethod.POST); // 재시도
+            }
+            throw e;
+        }
+    }
+
+    // [추가] 실제 요청 실행 로직 분리
+    private <T> T executeInternal(User user, KisApiRequest request, Class<T> responseType, HttpMethod method) {
         String accessToken = getAccessToken(user, request.isUseVirtualServer());
         HttpHeaders headers = buildHeaders(user, accessToken, request.getTrId());
         URI uri = buildUri(request.getPath(), request.getQueryParams(), request.isUseVirtualServer());
 
-        return executeWithRetry(uri, HttpMethod.POST, headers, request.getBody(), responseType);
+        return executeWithRetry(uri, method, headers, request.getBody(), responseType);
+    }
+
+    // [추가] 토큰 만료 에러인지 확인
+    private boolean isTokenExpiredError(BusinessException e) {
+        // 1. 기본 메시지 확인 (ErrorCode의 메시지)
+        String msg = e.getMessage();
+
+        // 2. 상세 메시지 확인 (실제 KIS API 에러 메시지가 여기 들어있음)
+        String detail = e.getDetail();
+
+        boolean inMsg = msg != null && (msg.contains("EGW00123") || msg.contains("만료된 token") || msg.contains("expired"));
+        boolean inDetail = detail != null && (detail.contains("EGW00123") || detail.contains("만료된 token") || detail.contains("expired"));
+
+        return inMsg || inDetail;
     }
 
     /**
@@ -213,13 +246,18 @@ public class KisApiClient {
     private String parseKisErrorMessage(RestClientResponseException e) {
         try {
             String body = e.getResponseBodyAsString();
-            // 간단한 JSON 파싱 (실제로는 더 정교하게 처리 가능)
+            // msg1 뿐만 아니라 msg_cd도 함께 로깅에 포함하거나 반환
+            // 여기서는 기존 로직 유지하되, 메시지에 코드가 포함되면 isTokenExpiredError에서 감지 가능
             if (body.contains("msg1")) {
                 int start = body.indexOf("msg1") + 7;
                 int end = body.indexOf("\"", start);
-                if (end > start) {
-                    return body.substring(start, end);
+                String msg1 = (end > start) ? body.substring(start, end) : "";
+
+                // msg_cd도 찾아서 붙여줌 (선택사항)
+                if(body.contains("EGW00123")) {
+                    return msg1 + " (EGW00123)";
                 }
+                return msg1;
             }
             return "KIS API 오류: " + e.getStatusCode();
         } catch (Exception ex) {
