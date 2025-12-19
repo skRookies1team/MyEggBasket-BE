@@ -27,14 +27,7 @@ public class KisRealtimeConnector {
     private static final String CUST_TYPE = "P";
     private static final Long FALLBACK_USER_ID = 1L;
 
-    /**
-     * 페이지 이동/리렌더링 등으로 STOMP 세션이 잠깐 끊겼다가 재연결되는 경우가 있습니다.
-     * 그 순간에 "마지막 구독자=0" 이벤트가 들어오면, 우리가 즉시 KIS UNREGISTER/close를 해버려서
-     * 메인페이지(또는 공통 리스트)의 실시간 체결가가 끊겨 보일 수 있습니다.
-     *
-     * 그래서 "마지막 구독자=0"이 되더라도 바로 끊지 않고, 잠깐의 유예 시간(grace)을 둔 뒤 끊습니다.
-     * 유예 시간 내에 다시 구독이 들어오면(=사용자 페이지 전환/재연결), 예약된 disconnect는 취소됩니다.
-     */
+    // 구독 취소하기까지 유예시간
     private static final long DISCONNECT_GRACE_MS = 15_000L;
 
     private final KisAuthService kisAuthService;
@@ -74,21 +67,21 @@ public class KisRealtimeConnector {
 
     /**
      * 즉시 disconnect(UNREGISTER/close)하지 않고 유예 후 처리.
-     * 유예 시간 내에 다시 구독이 오면 connectIfAbsent()에서 자동 cancel됩니다.
+     * 유예시간 내에 다시 구독이 오면 connectIfAbsent()에서 자동 cancel.
      */
     public void scheduleDisconnect(boolean useVirtualServer, String stockCode) {
         Map<String, ScheduledFuture<?>> taskMap = useVirtualServer ? virtualDisconnectTasks : realDisconnectTasks;
 
-        // 이미 예약이 있으면 갱신하지 않음(중복 예약 방지)
+        // 이미 취소예약이 있으면 갱신하지 않음(중복 예약 방지)
         if (taskMap.containsKey(stockCode)) return;
 
         ScheduledFuture<?> future = disconnectScheduler.schedule(() -> {
             try {
-                // 실행 시점에 "이 예약이 아직 유효한지" 확인
+                // 실행 시점에 "이 취소예약이 아직 유효한지" 확인
                 ScheduledFuture<?> cur = taskMap.get(stockCode);
                 if (cur == null) return;
 
-                // 현재 예약을 제거하고, 실제 disconnect 수행
+                // 현재 취소예약을 제거하고, 실제 disconnect 수행
                 taskMap.remove(stockCode);
                 disconnectIfPresent(useVirtualServer, stockCode);
             } catch (Exception e) {
