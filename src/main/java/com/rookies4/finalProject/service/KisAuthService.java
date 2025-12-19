@@ -31,67 +31,82 @@ public class KisAuthService {
     private final KisAuthRepository kisAuthRepository;
     private final EncryptionUtil encryptionUtil;
 
-    @Transactional(propagation = Propagation.REQUIRES_NEW) // 트랜잭션 전파 설정 추가
+    /**
+     * ✅ REST API용 access_token
+     * - 만료 전이면 재사용
+     * - 만료 시 재발급
+     */
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
     public KisAuthTokenDTO.KisTokenResponse issueToken(boolean useVirtualServer, User user) {
         return kisAuthRepository.findByUser(user)
                 .filter(token -> !isTokenExpired(token))
                 .map(token -> {
-                    log.info("기존 KIS 토큰 재사용: userId={}, expiresAt={}", user.getId(), token.getAccessTokenTokenExpired());
+                    log.info("기존 KIS 토큰 재사용: userId={}, expiresAt={}",
+                            user.getId(), token.getAccessTokenTokenExpired());
                     return KisAuthTokenDTO.KisTokenResponse.fromEntity(token);
                 })
                 .orElseGet(() -> {
                     log.info("신규 KIS 토큰 발급: userId={}", user.getId());
                     KisAuthTokenDTO.KisTokenRequest tokenRequest = buildTokenRequest(user);
-                    KisAuthTokenDTO.KisTokenResponse response = requestNewToken(useVirtualServer, tokenRequest);
+                    KisAuthTokenDTO.KisTokenResponse response =
+                            requestNewToken(useVirtualServer, tokenRequest);
                     saveOrUpdateToken(user, response);
                     return response;
                 });
     }
-    // [추가] 토큰 강제 만료 처리 메서드
+
+    /**
+     * 🔥 WebSocket용 approval_key
+     * - ❌ 재사용 절대 금지
+     * - ✅ 무조건 새로 발급
+     */
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
+    public String issueApprovalKey(boolean useVirtualServer, User user) {
+        log.info("웹소켓 접속키 신규 발급(재사용 금지): userId={}", user.getId());
+        return reissueApprovalKey(useVirtualServer, user);
+    }
+
+    /**
+     * WebSocket approval_key 강제 재발급
+     */
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
+    public String reissueApprovalKey(boolean useVirtualServer, User user) {
+        KisAuthToken token = kisAuthRepository.findByUser(user)
+                .orElseThrow(() ->
+                        new BusinessException(ErrorCode.AUTH_TOKEN_NOT_FOUND,
+                                "인증 토큰 정보가 없습니다.")
+                );
+
+        log.info("웹소켓 접속키 강제 재발급: userId={}", user.getId());
+
+        KisAuthTokenDTO.KisApprovalKeyResponse response =
+                requestNewApprovalKey(useVirtualServer, user);
+
+        token.setApprovalKey(response.getApprovalKey());
+        kisAuthRepository.save(token);
+
+        return response.getApprovalKey();
+    }
+
+    /**
+     * 토큰 강제 만료 (필요 시)
+     */
     @Transactional(propagation = Propagation.REQUIRES_NEW)
     public void expireToken(User user) {
         kisAuthRepository.findByUser(user).ifPresent(token -> {
             log.info("KIS 토큰 강제 만료 처리: userId={}", user.getId());
-            // 만료 시간을 현재 시간보다 과거로 설정하여 다음 요청 시 재발급 유도
             token.setAccessTokenTokenExpired(LocalDateTime.now().minusMinutes(1));
             kisAuthRepository.save(token);
         });
     }
 
-    @Transactional(propagation = Propagation.REQUIRES_NEW) // 트랜잭션 전파 설정 추가
-    public String issueApprovalKey(boolean useVirtualServer, User user) {
-        KisAuthToken token = kisAuthRepository.findByUser(user)
-                .orElseThrow(() -> new BusinessException(ErrorCode.AUTH_TOKEN_NOT_FOUND, "인증 토큰 정보가 없습니다."));
-
-        if (token.getApprovalKey() != null) {
-            log.info("기존 웹소켓 접속키 재사용: userId={}", user.getId());
-            return token.getApprovalKey();
-        }
-
-        log.info("신규 웹소켓 접속키 발급: userId={}", user.getId());
-        KisAuthTokenDTO.KisApprovalKeyResponse response = requestNewApprovalKey(useVirtualServer, user);
-        token.setApprovalKey(response.getApprovalKey());
-        kisAuthRepository.save(token);
-        return response.getApprovalKey();
-    }
-
-    @Transactional(propagation = Propagation.REQUIRES_NEW)
-    public String reissueApprovalKey(boolean useVirtualServer, User user) {
-        KisAuthToken token = kisAuthRepository.findByUser(user)
-                .orElseThrow(() -> new BusinessException(ErrorCode.AUTH_TOKEN_NOT_FOUND, "인증 토큰 정보가 없습니다."));
-
-        log.info("웹소켓 접속키 강제 재발급: userId={}", user.getId());
-
-        KisAuthTokenDTO.KisApprovalKeyResponse response = requestNewApprovalKey(useVirtualServer, user);
-
-        token.setApprovalKey(response.getApprovalKey());
-        kisAuthRepository.save(token);
-
-        return response.getApprovalKey();
-    }
+    /* =========================
+       내부 유틸 메서드
+       ========================= */
 
     private boolean isTokenExpired(KisAuthToken token) {
-        return token.getAccessTokenTokenExpired().isBefore(LocalDateTime.now().plusMinutes(5));
+        return token.getAccessTokenTokenExpired()
+                .isBefore(LocalDateTime.now().plusMinutes(5));
     }
 
     private KisAuthTokenDTO.KisTokenRequest buildTokenRequest(User user) {
@@ -102,7 +117,10 @@ public class KisAuthService {
                 .build();
     }
 
-    private KisAuthTokenDTO.KisTokenResponse requestNewToken(boolean useVirtualServer, KisAuthTokenDTO.KisTokenRequest request) {
+    private KisAuthTokenDTO.KisTokenResponse requestNewToken(
+            boolean useVirtualServer,
+            KisAuthTokenDTO.KisTokenRequest request
+    ) {
         try {
             return restTemplate.postForObject(
                     KisApiConfig.tokenUrl(useVirtualServer),
@@ -111,11 +129,17 @@ public class KisAuthService {
             );
         } catch (RestClientException e) {
             log.error("KIS 토큰 발급 API 호출 실패", e);
-            throw new BusinessException(ErrorCode.KIS_API_ERROR, "토큰 발급에 실패했습니다.");
+            throw new BusinessException(
+                    ErrorCode.KIS_API_ERROR,
+                    "토큰 발급에 실패했습니다."
+            );
         }
     }
 
-    private KisAuthTokenDTO.KisApprovalKeyResponse requestNewApprovalKey(boolean useVirtualServer, User user) {
+    private KisAuthTokenDTO.KisApprovalKeyResponse requestNewApprovalKey(
+            boolean useVirtualServer,
+            User user
+    ) {
         HttpHeaders headers = new HttpHeaders();
         headers.setContentType(MediaType.APPLICATION_JSON);
 
@@ -125,10 +149,11 @@ public class KisAuthService {
         Map<String, String> requestBody = Map.of(
                 "grant_type", "client_credentials",
                 "appkey", decryptedAppkey,
-                "secretkey", decryptedAppsecret  
+                "secretkey", decryptedAppsecret
         );
 
-        HttpEntity<Map<String, String>> requestEntity = new HttpEntity<>(requestBody, headers);
+        HttpEntity<Map<String, String>> requestEntity =
+                new HttpEntity<>(requestBody, headers);
 
         try {
             return restTemplate.postForObject(
@@ -138,7 +163,10 @@ public class KisAuthService {
             );
         } catch (RestClientException e) {
             log.error("KIS 웹소켓 접속키 발급 API 호출 실패", e);
-            throw new BusinessException(ErrorCode.KIS_API_ERROR, "웹소켓 접속키 발급에 실패했습니다.");
+            throw new BusinessException(
+                    ErrorCode.KIS_API_ERROR,
+                    "웹소켓 접속키 발급에 실패했습니다."
+            );
         }
     }
 
@@ -151,6 +179,7 @@ public class KisAuthService {
                 response.getToken_type(),
                 response.getExpires_in()
         );
+
         kisAuthRepository.save(token);
     }
 }
