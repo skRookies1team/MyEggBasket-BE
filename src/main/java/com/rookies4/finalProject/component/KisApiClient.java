@@ -79,10 +79,29 @@ public class KisApiClient {
     // [추가] 실제 요청 실행 로직 분리
     private <T> T executeInternal(User user, KisApiRequest request, Class<T> responseType, HttpMethod method) {
         String accessToken = getAccessToken(user, request.isUseVirtualServer());
-        HttpHeaders headers = buildHeaders(user, accessToken, request.getTrId());
+
+        // 1. Body 데이터를 미리 JSON String으로 변환 (HashKey 생성 및 전송 데이터 일치 보장)
+        String jsonBody = null;
+        if (request.getBody() != null) {
+            try {
+                if (request.getBody() instanceof String) {
+                    jsonBody = (String) request.getBody();
+                } else {
+                    jsonBody = objectMapper.writeValueAsString(request.getBody());
+                }
+            } catch (Exception e) {
+                log.error("JSON Body serialization failed", e);
+                throw new BusinessException(ErrorCode.INTERNAL_SERVER_ERROR, "요청 데이터 변환 실패");
+            }
+        }
+
+        // 2. 헤더 생성 (4번째 인자로 jsonBody 전달 -> HashKey 생성에 사용)
+        HttpHeaders headers = buildHeaders(user, accessToken, request.getTrId(), jsonBody);
+
         URI uri = buildUri(request.getPath(), request.getQueryParams(), request.isUseVirtualServer());
 
-        return executeWithRetry(uri, method, headers, request.getBody(), responseType);
+        // 3. 변환된 jsonBody를 그대로 전송 (executeWithRetry에서 중복 변환 방지)
+        return executeWithRetry(uri, method, headers, jsonBody, responseType);
     }
 
     // [추가] 토큰 만료 에러인지 확인
@@ -194,7 +213,7 @@ public class KisApiClient {
     /**
      * HTTP 헤더 구성
      */
-    private HttpHeaders buildHeaders(User user, String accessToken, String trId) {
+    private HttpHeaders buildHeaders(User user, String accessToken, String trId, String jsonBody) {
         // 복호화 및 검증
         String decryptedAppkey = encryptionUtil.decrypt(user.getAppkey());
         String decryptedAppsecret = encryptionUtil.decrypt(user.getAppsecret());
@@ -218,6 +237,17 @@ public class KisApiClient {
         headers.set("appsecret", appsecret);
         headers.set("tr_id", trId);
         headers.setContentType(MediaType.APPLICATION_JSON);
+
+        // [추가] 실전 투자이고, POST 요청(Body가 있음)인 경우 HashKey 생성 및 추가
+        if (jsonBody != null && !jsonBody.isEmpty()) {
+            try {
+                // KIS API에서 제공하는 방식대로 HashKey 생성 (AppKey/Secret/Body 조합)
+                String hashkey = kisAuthService.getHashKey(user, jsonBody); // 서비스에 메서드 추가 필요
+                headers.set("hashkey", hashkey);
+            } catch (Exception e) {
+                log.error("HashKey 생성 실패", e);
+            }
+        }
 
         return headers;
     }

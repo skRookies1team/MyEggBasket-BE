@@ -13,7 +13,7 @@ import java.util.Map;
 public class KisApiConfig {
 
     //실전투자 서버 Base URL
-	private static final String BASE_URL = "https://openapi.koreainvestment.com:9443";
+	public static final String BASE_URL = "https://openapi.koreainvestment.com:9443";
 
     // 모의투자 서버 Base URL
 	private static final String VIRTUAL_BASE_URL = "https://openapivts.koreainvestment.com:29443";

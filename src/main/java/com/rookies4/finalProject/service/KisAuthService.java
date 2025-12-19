@@ -1,5 +1,6 @@
 package com.rookies4.finalProject.service;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.rookies4.finalProject.config.KisApiConfig;
 import com.rookies4.finalProject.domain.entity.KisAuthToken;
 import com.rookies4.finalProject.domain.entity.User;
@@ -13,6 +14,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpEntity;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
+import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
@@ -26,7 +28,7 @@ import java.util.Map;
 @Service
 @RequiredArgsConstructor
 public class KisAuthService {
-
+    private final ObjectMapper objectMapper;
     private final RestTemplate restTemplate;
     private final KisAuthRepository kisAuthRepository;
     private final EncryptionUtil encryptionUtil;
@@ -141,7 +143,38 @@ public class KisAuthService {
             throw new BusinessException(ErrorCode.KIS_API_ERROR, "웹소켓 접속키 발급에 실패했습니다.");
         }
     }
+    public String getHashKey(User user, String jsonBody) {
+        try {
+            // 헤더 설정
+            HttpHeaders headers = new HttpHeaders();
+            headers.setContentType(MediaType.APPLICATION_JSON);
+            headers.set("appkey", encryptionUtil.decrypt(user.getAppkey()));
+            headers.set("appsecret", encryptionUtil.decrypt(user.getAppsecret()));
+            headers.set("User-Agent", "Mozilla/5.0"); // 필수는 아니지만 안정성을 위해 권장
 
+            // Body는 이미 JSON 문자열 상태여야 함 (KisApiClient에서 변환해서 넘겨줌)
+            HttpEntity<String> entity = new HttpEntity<>(jsonBody, headers);
+
+            // 실전/모의 서버 구분 없이 HashKey 발급은 실전 URL 사용 권장 (또는 설정에 따름)
+            // 여기서는 안전하게 실전 URL로 고정하거나 Config에서 가져오세요.
+            String url = "https://openapi.koreainvestment.com:9443/uapi/hashkey";
+
+            // 요청 전송
+            ResponseEntity<Map> response = restTemplate.postForEntity(url, entity, Map.class);
+
+            Map<String, Object> body = response.getBody();
+            if (body != null && body.containsKey("HASH")) {
+                return (String) body.get("HASH");
+            }
+
+            log.error("HashKey 응답에 HASH 값이 없습니다: {}", body);
+            return null;
+
+        } catch (Exception e) {
+            log.error("HashKey 발급 실패: {}", e.getMessage());
+            throw new BusinessException(ErrorCode.KIS_API_ERROR, "HashKey 발급 중 오류 발생");
+        }
+    }
     private void saveOrUpdateToken(User user, KisAuthTokenDTO.KisTokenResponse response) {
         KisAuthToken token = kisAuthRepository.findByUser(user)
                 .orElse(KisAuthToken.builder().user(user).build());
