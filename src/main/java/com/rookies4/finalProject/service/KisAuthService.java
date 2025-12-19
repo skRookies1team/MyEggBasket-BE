@@ -75,6 +75,21 @@ public class KisAuthService {
         return response.getApprovalKey();
     }
 
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
+    public String reissueApprovalKey(boolean useVirtualServer, User user) {
+        KisAuthToken token = kisAuthRepository.findByUser(user)
+                .orElseThrow(() -> new BusinessException(ErrorCode.AUTH_TOKEN_NOT_FOUND, "인증 토큰 정보가 없습니다."));
+
+        log.info("웹소켓 접속키 강제 재발급: userId={}", user.getId());
+
+        KisAuthTokenDTO.KisApprovalKeyResponse response = requestNewApprovalKey(useVirtualServer, user);
+
+        token.setApprovalKey(response.getApprovalKey());
+        kisAuthRepository.save(token);
+
+        return response.getApprovalKey();
+    }
+
     private boolean isTokenExpired(KisAuthToken token) {
         return token.getAccessTokenTokenExpired().isBefore(LocalDateTime.now().plusMinutes(5));
     }

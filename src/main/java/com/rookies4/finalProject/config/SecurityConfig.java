@@ -69,7 +69,8 @@ public class SecurityConfig {
                                 "/api/app/kis/stock/**",
                                 "/api/app/kis/rank/**",
                                 "/api/test/**", // 테스트 API 허용
-                                "/ws/**"
+                                "/ws/**",
+                                "/test-stomp.html"
                         ).permitAll()
                         .requestMatchers("/swagger-ui/**", "/v3/api-docs/**", "/swagger-resources/**").permitAll()
                         .requestMatchers("/actuator/**").permitAll()
