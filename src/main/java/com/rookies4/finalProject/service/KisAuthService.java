@@ -47,6 +47,16 @@ public class KisAuthService {
                     return response;
                 });
     }
+    // [추가] 토큰 강제 만료 처리 메서드
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
+    public void expireToken(User user) {
+        kisAuthRepository.findByUser(user).ifPresent(token -> {
+            log.info("KIS 토큰 강제 만료 처리: userId={}", user.getId());
+            // 만료 시간을 현재 시간보다 과거로 설정하여 다음 요청 시 재발급 유도
+            token.setAccessTokenTokenExpired(LocalDateTime.now().minusMinutes(1));
+            kisAuthRepository.save(token);
+        });
+    }
 
     @Transactional(propagation = Propagation.REQUIRES_NEW) // 트랜잭션 전파 설정 추가
     public String issueApprovalKey(boolean useVirtualServer, User user) {
