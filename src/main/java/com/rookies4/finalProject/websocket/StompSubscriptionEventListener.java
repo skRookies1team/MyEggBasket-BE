@@ -23,7 +23,7 @@ public class StompSubscriptionEventListener {
     private final RealtimeSubscriptionManager subscriptionManager;
     private final KisRealtimeConnector kisConnector;
 
-    // ✅ sessionId -> (subscriptionId -> useVirtualServer)
+    // sessionId -> (subscriptionId -> useVirtualServer)
     private final Map<String, Map<String, Boolean>> virtualBySub = new ConcurrentHashMap<>();
 
     @EventListener
@@ -45,7 +45,7 @@ public class StompSubscriptionEventListener {
 
         boolean useVirtualServer = readVirtualFlag(acc);
 
-        // ✅ virtual 값 저장(나중에 unsubscribe/disconnect에서 필요)
+        // virtual 값 저장(나중에 unsubscribe/disconnect에서 필요)
         virtualBySub
                 .computeIfAbsent(sessionId, k -> new ConcurrentHashMap<>())
                 .put(subscriptionId, useVirtualServer);
@@ -57,6 +57,7 @@ public class StompSubscriptionEventListener {
                 sessionId, stockCode, count, useVirtualServer);
 
         if (count == 1) {
+            // (중요) 혹시 직전에 "disconnect 예약"이 걸려있다면 connectIfAbsent에서 취소됨
             kisConnector.connectIfAbsent(useVirtualServer, stockCode);
         }
     }
@@ -72,7 +73,7 @@ public class StompSubscriptionEventListener {
         RealtimeSubscriptionManager.UnsubResult r =
                 subscriptionManager.removeUnsubscribe(sessionId, subscriptionId);
 
-        // ✅ virtual 조회 후 제거
+        // virtual 조회 후 제거
         boolean useVirtualServer = removeVirtualFlag(sessionId, subscriptionId);
 
         if (r.destination() == null) return;
@@ -84,7 +85,8 @@ public class StompSubscriptionEventListener {
                 sessionId, stockCode, r.remain(), useVirtualServer);
 
         if (r.remain() == 0) {
-            kisConnector.disconnectIfPresent(useVirtualServer, stockCode); // ✅ 시그니처 맞춤
+            // 즉시 끊지 말고 유예 후 disconnect (페이지 전환/재연결에서 끊기는 문제 방지)
+            kisConnector.scheduleDisconnect(useVirtualServer, stockCode);
         }
     }
 
@@ -96,7 +98,7 @@ public class StompSubscriptionEventListener {
         // disconnect인 경우: 이 세션이 마지막 구독자였던 destination들만 내려옴
         Set<String> zeroDestinations = subscriptionManager.removeAllByDisconnect(sessionId);
 
-        // ✅ 세션의 subscriptionId -> virtual 맵 제거 (기본은 false로 처리)
+        // 세션의 subscriptionId -> virtual 맵 제거 (기본은 false로 처리)
         Map<String, Boolean> subsVirtual = virtualBySub.remove(sessionId);
 
         for (String dest : zeroDestinations) {
@@ -104,18 +106,15 @@ public class StompSubscriptionEventListener {
 
             String stockCode = dest.substring(DEST_PREFIX.length());
 
-            // 세션 disconnect 상황에선 “어떤 subscriptionId였는지”를 destination만으론 모르니
-            // virtual을 정확히 매핑하기 어려움 → 테스트/기본은 false 처리
-            boolean useVirtualServer = false;
-            if (subsVirtual != null && subsVirtual.containsValue(true)) {
-                // 세션에서 virtual=true로 구독한 게 하나라도 있으면 true로 보는 보수적 처리
-                useVirtualServer = true;
-            }
+            // disconnect 상황에선 destination만으론 subscriptionId를 모르니
+            // virtual을 정확히 매핑하기 어려움 → 보수적으로 "true가 하나라도 있으면 true"
+            boolean useVirtualServer = subsVirtual != null && subsVirtual.containsValue(true);
 
             log.info("[STOMP] disconnect session={}, last-subscriber stockCode={}, virtual={}",
                     sessionId, stockCode, useVirtualServer);
 
-            kisConnector.disconnectIfPresent(useVirtualServer, stockCode); // ✅ 시그니처 맞춤
+            // 즉시 끊지 말고 유예 후 disconnect
+            kisConnector.scheduleDisconnect(useVirtualServer, stockCode);
         }
     }
 
