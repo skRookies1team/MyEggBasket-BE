@@ -1,0 +1,145 @@
+<!doctype html>
+<html lang="ko">
+<head>
+    <meta charset="utf-8" />
+    <title>STOMP Realtime Test</title>
+
+    <!-- 🔥 반드시 필요 -->
+    <script src="https://cdn.jsdelivr.net/npm/sockjs-client@1/dist/sockjs.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@stomp/stompjs@7.0.0/bundles/stomp.umd.min.js"></script>
+
+    <style>
+        body { font-family: sans-serif; padding: 16px; }
+        input { width: 120px; }
+        button { margin-right: 6px; }
+        pre { background: #111; color: #0f0; padding: 12px; height: 360px; overflow: auto; }
+        .row { margin-bottom: 10px; }
+    </style>
+</head>
+<body>
+
+<h3>Realtime STOMP Test</h3>
+
+<div class="row">
+    StockCode:
+    <input id="code" value="005930" />
+
+    Scope:
+    <select id="scope">
+        <option value="persistent">persistent (메인)</option>
+        <option value="page">page (상세)</option>
+    </select>
+
+    Virtual:
+    <select id="virtual">
+        <option value="false">false (실서버)</option>
+        <option value="true">true (모의서버)</option>
+    </select>
+
+    <button onclick="connect()">connect</button>
+    <button onclick="subscribe()">subscribe</button>
+    <button onclick="unsubscribe()">unsubscribe</button>
+    <button onclick="disconnect()">disconnect</button>
+</div>
+
+<pre id="log"></pre>
+
+<script>
+    let client;
+    const subs = {};
+
+    const logEl = document.getElementById("log");
+    const log = (m) => {
+        logEl.textContent += `[${new Date().toLocaleTimeString()}] ${m}\n`;
+        logEl.scrollTop = logEl.scrollHeight;
+    };
+
+    function connect() {
+        if (client?.active || client?.connected) {
+            log("⚠ already connected");
+            return;
+        }
+
+        // 🔥 핵심: brokerURL ❌ / SockJS ✅
+        client = new StompJs.Client({
+            webSocketFactory: () => new SockJS("http://localhost:8081/ws"),
+            reconnectDelay: 0,
+            debug: msg => log("[STOMP] " + msg),
+
+            onConnect: () => log("✅ CONNECTED"),
+            onDisconnect: () => log("🔌 DISCONNECTED"),
+            onStompError: f => log("❌ STOMP ERROR " + (f?.body ?? "")),
+            onWebSocketError: e => log("❌ WS ERROR " + (e?.message ?? e))
+        });
+
+        client.activate();
+    }
+
+    function subscribe() {
+        if (!client?.connected) {
+            log("❌ not connected");
+            return;
+        }
+
+        const code = document.getElementById("code").value.trim();
+        if (!code) {
+            log("❌ stockCode empty");
+            return;
+        }
+
+        if (subs[code]) {
+            log("⚠ already subscribed " + code);
+            return;
+        }
+
+        const scope = document.getElementById("scope").value;
+        const virtual = document.getElementById("virtual").value;
+        const dest = `/topic/realtime-price/${code}`;
+
+        const headers = {
+            scope,
+            virtual
+        };
+
+        const sub = client.subscribe(
+            dest,
+            msg => log(`📩 [${code}] ${msg.body}`),
+            headers
+        );
+
+        subs[code] = sub;
+        log(`✅ SUBSCRIBE ${code}`);
+    }
+
+    function unsubscribe() {
+        const code = document.getElementById("code").value.trim();
+        const sub = subs[code];
+
+        if (!sub) {
+            log("⚠ no subscription");
+            return;
+        }
+
+        sub.unsubscribe();
+        delete subs[code];
+        log(`✅ UNSUBSCRIBE ${code}`);
+    }
+
+    function disconnect() {
+        Object.values(subs).forEach(s => {
+            try { s.unsubscribe(); } catch (_) {}
+        });
+
+        for (const k in subs) delete subs[k];
+
+        if (client) {
+            client.deactivate();
+            client = null;
+        }
+
+        log("🔌 DEACTIVATE CALLED");
+    }
+</script>
+
+</body>
+</html>

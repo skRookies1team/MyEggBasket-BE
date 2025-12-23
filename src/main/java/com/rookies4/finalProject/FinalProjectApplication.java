@@ -3,9 +3,15 @@ package com.rookies4.finalProject;
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
 import org.springframework.boot.autoconfigure.domain.EntityScan;
+import org.springframework.retry.annotation.EnableRetry;
+import org.springframework.cache.annotation.EnableCaching;
+import org.springframework.scheduling.annotation.EnableScheduling;
 
+@EnableScheduling
+@EnableCaching
 @SpringBootApplication
 @EntityScan(basePackages = "com.rookies4.finalProject.domain.entity")
+@EnableRetry
 public class FinalProjectApplication {
 
 	public static void main(String[] args) {

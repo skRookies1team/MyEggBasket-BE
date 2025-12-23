@@ -1,5 +1,6 @@
 package com.rookies4.finalProject.domain.entity;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import jakarta.persistence.*;
 import jakarta.validation.constraints.Email;
 import lombok.AllArgsConstructor;
@@ -7,6 +8,8 @@ import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 import java.time.LocalDateTime;
+import java.util.ArrayList;
+import java.util.List;
 
 @Entity
 @Table(name = "users")
@@ -36,16 +39,17 @@ public class User {
     // password(VARCHAR(255) NOT NULL)에 매핑
     // 비밀번호
     @Column(name = "password", nullable = false, length = 255)
+    @JsonIgnore // JSON 변환 시 제외
     private String password;
 
-    // appkey(VARCHAR(255))에 매핑 - 증권사 API Key (암호화 필수)
-    // 증권사 API Key
-    @Column(name = "appkey", length = 255)
+    // appkey(VARCHAR(500))에 매핑 - 증권사 API Key (암호화 필수)
+    @Column(name = "appkey", length = 500)
+    @JsonIgnore // JSON 변환 시 제외
     private String appkey;
 
-    // appsecret(VARCHAR(255))에 매핑 - 증권사 API Secret (암호화 필수)
-    // 증권사 API Secret
-    @Column(name = "appsecret", length = 255)
+    // appsecret(VARCHAR(500))에 매핑 - 증권사 API Secret (암호화 필수)
+    @Column(name = "appsecret", length = 500)
+    @JsonIgnore // JSON 변환 시 제외
     private String appsecret;
 
     @Column(name="account", length = 8)
@@ -55,6 +59,18 @@ public class User {
     // FCM 토큰
     @Column(name = "fcm_token", length = 255)
     private String fcmToken;
+
+    @OneToMany(mappedBy = "user", cascade = CascadeType.REMOVE, orphanRemoval = true)
+    private List<InterestStock> interestStocks = new ArrayList<>();
+
+    @OneToOne(mappedBy = "user", fetch = FetchType.LAZY, cascade = CascadeType.REMOVE, orphanRemoval = true)
+    private KisAuthToken kisAuthToken = new KisAuthToken();
+
+    @OneToMany(mappedBy = "user", cascade = CascadeType.REMOVE, orphanRemoval = true)
+    private List<Portfolio> portfolios = new ArrayList<>();
+
+    @OneToMany(mappedBy = "user", cascade = CascadeType.REMOVE, orphanRemoval = true)
+    private List<Transaction> transactions = new ArrayList<>();
 
     // created_at(TIMESTAMP DEFAULT CURRENT_TIMESTAMP)에 매핑
     // 생성 시각

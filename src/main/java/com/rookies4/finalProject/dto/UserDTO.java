@@ -65,6 +65,7 @@ public class UserDTO {
         private Long id;
         private String email;
         private String username;
+        // appkey, appsecret 필드 제거
         private LocalDateTime createdAt;
         private LocalDateTime updatedAt;
 
@@ -74,6 +75,7 @@ public class UserDTO {
                     .id(user.getId())
                     .email(user.getEmail())
                     .username(user.getUsername())
+                    // appkey, appsecret 매핑 제거
                     .createdAt(user.getCreatedAt())
                     .updatedAt(user.getUpdatedAt())
                     .build();

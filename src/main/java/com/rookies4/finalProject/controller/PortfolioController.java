@@ -51,8 +51,16 @@ public class PortfolioController {
     //6. 포트폴리오 종목 추가
     @PostMapping("/{portfolioId}/holdings")
     public ResponseEntity<HoldingDTO.HoldingResponse> addHolding(@PathVariable Long portfolioId, @Valid @RequestBody HoldingDTO.HoldingRequest request){
-        return ResponseEntity.status(HttpStatus.CREATED).body(holdingService.addHolding(portfolioId,request));
+        return ResponseEntity.status(HttpStatus.CREATED).body(holdingService.addHolding(portfolioId, request));
     }
+
+    //6. 포트폴리오 종목 삭제
+    @DeleteMapping("/{portfolioId}/holdings{holdingId}")
+    public ResponseEntity<HoldingDTO.HoldingResponse> deleteHolding(@PathVariable Long portfolioId, @PathVariable Long holdingId){
+        holdingService.deleteHolding(portfolioId, holdingId);
+        return ResponseEntity.noContent().build();
+    }
+
     //7. 포트폴리오 보유종목 조회
     @GetMapping("/{portfolioId}/holdings")
     public ResponseEntity<List<HoldingDTO.HoldingResponse>> readHoldings(@PathVariable Long portfolioId){
@@ -61,7 +69,7 @@ public class PortfolioController {
 
     //8. 포트폴리오 보유종목 수정
     @PutMapping("/{portfolioId}/holdings/{holdingId}")
-    public ResponseEntity<HoldingDTO.HoldingResponse> updateHolding(@PathVariable Long portfolioId,@PathVariable Long holdingId,  @Valid @RequestBody HoldingDTO.HoldingRequest request){
+    public ResponseEntity<HoldingDTO.HoldingResponse> updateHolding(@PathVariable Long portfolioId, @PathVariable Long holdingId,  @Valid @RequestBody HoldingDTO.HoldingRequest request){
         return ResponseEntity.ok(holdingService.updateHolding(portfolioId, holdingId, request));
     }
 }

@@ -31,12 +31,18 @@ public class Transaction {
     @JoinColumn(name = "stock_code")
     private Stock stock;
 
+    @Column(name = "order_no", length = 20)
+    private String orderNo;
+
     @Enumerated(EnumType.STRING)
     @Column(name = "type", length = 10, nullable = false)
     private TransactionType type; // BUY, SELL
 
     @Column(name = "quantity")
     private Integer quantity; // 거래 수량
+
+    @Column(name = "filled_quantity")
+    private Integer filledQuantity;
 
     @Column(name = "price", precision = 20, scale = 2)
     private BigDecimal price; // 체결 가격
@@ -66,7 +72,11 @@ public class Transaction {
 
         // status 가 설정되지 않았다면 기본적으로 'PENDING' 으로 설정
         if (this.status == null) {
-            this.status = TransactionStatus.COMPLETED;
+            this.status = TransactionStatus.PENDING;
+        }
+
+        if (this.filledQuantity == null) {
+            this.filledQuantity = 0;
         }
     }
 

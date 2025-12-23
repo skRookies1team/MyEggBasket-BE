@@ -24,46 +24,49 @@ public class Stock {
     private String name; // 종목명 (예: 삼성전자)
 
     @Column(name = "market_type", length = 20)
-    private String marketType; // KOSPI, KOSDAQ
+    private String marketType; // KOSPI, KOSDAQ, KONEX
 
     @Column(name = "sector", length = 50)
-    private String sector; // 섹터 (반도체, 2차전지 등)
+    private String sector; // 업종명
 
     @Column(name = "industry_code", length = 20)
-    private String industryCode; // 산업분류코드
+    private String industryCode; // 업종코드
+
+    @Column(name = "corp_code", length = 8, unique = true)
+    private String corpCode; // 법인고유번호 (DART용 8자리)
 
     // 보유 내역
-    @OneToMany(mappedBy = "stock", cascade = CascadeType.ALL, orphanRemoval = true)
+    @OneToMany(mappedBy = "stock", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.LAZY)
     @Builder.Default
     private List<Holding> holdings = new ArrayList<>();
 
     // 거래 내역
-    @OneToMany(mappedBy = "stock", cascade = CascadeType.ALL, orphanRemoval = true)
+    @OneToMany(mappedBy = "stock", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.LAZY)
     @Builder.Default
     private List<Transaction> transactions = new ArrayList<>();
 
     // AI 추천 내역
-    @OneToMany(mappedBy = "stock", cascade = CascadeType.ALL, orphanRemoval = true)
+    @OneToMany(mappedBy = "stock", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.LAZY)
     @Builder.Default
     private List<AIRecommendation> recommendations = new ArrayList<>();
 
     // 피처 데이터
-    @OneToMany(mappedBy = "stock", cascade = CascadeType.ALL, orphanRemoval = true)
+    @OneToMany(mappedBy = "stock", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.LAZY)
     @Builder.Default
     private List<StockFeatures> features = new ArrayList<>();
 
     // 이 종목이 영향을 주는 관계들 (from_stock)
-    @OneToMany(mappedBy = "fromStock", cascade = CascadeType.ALL, orphanRemoval = true)
+    @OneToMany(mappedBy = "fromStock", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.LAZY)
     @Builder.Default
     private List<StockRelation> outgoingRelations = new ArrayList<>();
 
     // 이 종목이 영향을 받는 관계들 (to_stock)
-    @OneToMany(mappedBy = "toStock", cascade = CascadeType.ALL, orphanRemoval = true)
+    @OneToMany(mappedBy = "toStock", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.LAZY)
     @Builder.Default
     private List<StockRelation> incomingRelations = new ArrayList<>();
 
     // 이 종목을 관심 종목으로 등록한 사용자 목록
-    @OneToMany(mappedBy = "stock", cascade = CascadeType.ALL, orphanRemoval = true)
+    @OneToMany(mappedBy = "stock", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.LAZY)
     @Builder.Default
     private List<InterestStock> interestedUsers = new ArrayList<>();
 

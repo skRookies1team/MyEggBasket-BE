@@ -1,30 +1,26 @@
 package com.rookies4.finalProject.repository;
 
 import com.rookies4.finalProject.domain.entity.User;
+import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.JpaRepository;
-import org.springframework.stereotype.Repository;
-
+import org.springframework.data.jpa.repository.Query; // 추가
+import org.springframework.data.repository.query.Param; // 추가
 import java.util.Optional;
 
-@Repository
 public interface UserRepository extends JpaRepository<User, Long> {
 
-    /**
-     * email(이메일)을 통해 User 엔티티를 조회합니다.
-     * email 필드에 unique 제약 조건이 있으므로 Optional<User>로 반환하여
-     * 사용자가 존재하지 않을 경우를 안전하게 처리합니다.
-     *
-     * @param email 조회할 사용자 이메일
-     * @return 해당 이메일을 가진 User 엔티티 (존재하지 않을 경우 Optional.empty())
-     */
+    // 1. 이메일로 찾기 (토큰 포함)
+    @EntityGraph(attributePaths = "kisAuthToken")
+    @Query("SELECT u FROM User u WHERE u.email = :email") // JPQL 명시
+    Optional<User> findWithTokenByEmail(@Param("email") String email);
+
+    // 2. ID(PK)로 찾기
+    @EntityGraph(attributePaths = "kisAuthToken")
+    @Query("SELECT u FROM User u WHERE u.id = :userId") // User 엔티티의 필드명이 'userId'인지 확인 필수!
+    Optional<User> findWithTokenByUserId(@Param("userId") Long userId);
+
     Optional<User> findByEmail(String email);
 
-    /**
-     * email을 통해 사용자가 존재하는지 여부를 확인합니다.
-     *
-     * @param email 확인할 사용자 이메일
-     * @return 사용자 존재 여부 (true/false)
-     */
     boolean existsByEmail(String email);
 
     // 이 외에도 JpaRepository를 상속받아 save(), findById(), findAll(), delete() 등의

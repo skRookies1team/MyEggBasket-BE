@@ -20,6 +20,7 @@ public class StockDTO {
         private String stockCode; // 종목코드 (예: 005930)
         private String name; // 종목명 (예: 삼성전자)
         private String marketType; // KOSPI, KOSDAQ
+        private String corpCode;
         private String sector; // 섹터 (반도체, 2차전지 등)
         private String industryCode; // 산업분류코드
     }
@@ -32,6 +33,7 @@ public class StockDTO {
         private String stockCode; // 종목코드 (예: 005930)
         private String name; // 종목명 (예: 삼성전자)
         private String marketType; // KOSPI, KOSDAQ
+        private String corpCode;
         private String sector; // 섹터 (반도체, 2차전지 등)
         private String industryCode; // 산업분류코드
 
@@ -41,6 +43,7 @@ public class StockDTO {
                     .stockCode(stock.getStockCode())
                     .name(stock.getName())
                     .marketType(stock.getMarketType())
+                    .corpCode(stock.getCorpCode())
                     .sector(stock.getSector())
                     .industryCode(stock.getIndustryCode())
                     .build();
