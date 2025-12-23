@@ -34,7 +34,7 @@ public class KisAuthService {
     private final EncryptionUtil encryptionUtil;
 
     /**
-     * ✅ REST API용 access_token
+     * REST API용 accessToken
      * - 만료 전이면 재사용
      * - 만료 시 재발급
      */
@@ -208,9 +208,9 @@ public class KisAuthService {
                 .orElse(KisAuthToken.builder().user(user).build());
 
         token.updateToken(
-                response.getAccess_token(),
-                response.getToken_type(),
-                response.getExpires_in()
+                response.getAccessToken(),
+                response.getTokenType(),
+                response.getExpiresIn()
         );
 
         kisAuthRepository.save(token);

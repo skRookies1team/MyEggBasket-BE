@@ -46,13 +46,14 @@ public class KisInvestorTrendService {
             List<KisInvestorTrendDTO.KisOutput> outputList = body.getOutput();
             KisInvestorTrendDTO.KisOutput targetOutput;
 
+            // 장중(16시 이전)이면 전일 데이터(index 1), 장마감 후엔 당일 데이터(index 0)
             LocalTime now = LocalTime.now();
             LocalTime marketCloseTime = LocalTime.of(16, 0);
 
             if (now.isBefore(marketCloseTime) && outputList.size() > 1) {
-                targetOutput = outputList.get(1);
+                targetOutput = outputList.get(1);  // 전일 데이터
             } else {
-                targetOutput = outputList.get(0);
+                targetOutput = outputList.get(0);  // 당일 데이터
             }
 
             String stockName = stockRepository.findById(stockCode)

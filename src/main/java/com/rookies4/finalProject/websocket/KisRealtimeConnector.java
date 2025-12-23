@@ -3,6 +3,7 @@ package com.rookies4.finalProject.websocket;
 import com.rookies4.finalProject.domain.entity.User;
 import com.rookies4.finalProject.service.KisAuthService;
 import com.rookies4.finalProject.service.UserService;
+import jakarta.annotation.PreDestroy;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
@@ -47,6 +48,37 @@ public class KisRealtimeConnector {
     // useVirtual(false/true) 각각 따로 관리 (key = stockCode)
     private final Map<String, ScheduledFuture<?>> realDisconnectTasks = new ConcurrentHashMap<>();
     private final Map<String, ScheduledFuture<?>> virtualDisconnectTasks = new ConcurrentHashMap<>();
+
+    /**
+     * 애플리케이션 종료 시 리소스 정리
+     * - ScheduledExecutorService graceful shutdown
+     * - WebSocket 세션 종료
+     */
+    @PreDestroy
+    public void shutdown() {
+        log.info("[KIS] 애플리케이션 종료 - 리소스 정리 시작");
+
+        // 1. 스케줄러 종료
+        disconnectScheduler.shutdown();
+        try {
+            if (!disconnectScheduler.awaitTermination(5, TimeUnit.SECONDS)) {
+                log.warn("[KIS] 스케줄러가 5초 내에 종료되지 않아 강제 종료합니다.");
+                disconnectScheduler.shutdownNow();
+            } else {
+                log.info("[KIS] 스케줄러가 정상적으로 종료되었습니다.");
+            }
+        } catch (InterruptedException e) {
+            log.error("[KIS] 스케줄러 종료 중 인터럽트 발생", e);
+            disconnectScheduler.shutdownNow();
+            Thread.currentThread().interrupt();
+        }
+
+        // 2. WebSocket 세션 종료
+        closeState(real);
+        closeState(virtual);
+
+        log.info("[KIS] 리소스 정리 완료");
+    }
 
     public void connectIfAbsent(boolean useVirtualServer, String stockCode) {
         // 혹시 이전에 "disconnect 예약"이 걸려있다면 먼저 취소
@@ -168,12 +200,16 @@ public class KisRealtimeConnector {
     private void closeState(ConnectionState st) {
         synchronized (st.lock) {
             try {
-                if (st.session != null && st.session.isOpen()) st.session.close();
+                if (st.session != null && st.session.isOpen()) {
+                    log.info("[KIS] 세션 종료 중: {}", st.session.getId());
+                    st.session.close();
+                }
             } catch (Exception e) {
                 log.warn("[KIS] close error", e);
             } finally {
                 st.session = null;
                 st.handler = null;
+                st.subscribed.clear();
             }
         }
     }

@@ -71,7 +71,7 @@ class SecureLoggerTest {
     @DisplayName("JSON 문자열에서 token을 마스킹한다")
     void testMaskToken() {
         // given
-        String json = "{\"token\":\"abc123token\",\"access_token\":\"xyz456token\"}";
+        String json = "{\"token\":\"abc123token\",\"accessToken\":\"xyz456token\"}";
 
         // when
         String masked = secureLogger.maskSensitive(json);

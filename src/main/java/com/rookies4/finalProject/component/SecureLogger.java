@@ -42,12 +42,9 @@ public class SecureLogger {
             "approval_key",
             "password",
             "token",
-            "access_token",
             "accessToken",
-            "refresh_token",
             "refreshToken",
             "secret",
-            "api_key",
             "apiKey",
             "authorization",
             "bearer"

@@ -37,13 +37,13 @@ public class KisAuthTokenDTO {
     @Builder
     public static class KisTokenResponse {
         @JsonProperty("access_token")
-        private String access_token;
+        private String accessToken;
         
         @JsonProperty("token_type")
-        private String token_type;
+        private String tokenType;
         
         @JsonProperty("expires_in")
-        private int expires_in;
+        private int expiresIn;
         
         private String scope;
         
@@ -53,17 +53,12 @@ public class KisAuthTokenDTO {
         // 엔티티 -> DTO 변환 메소드 추가
         public static KisTokenResponse fromEntity(KisAuthToken entity) {
             return KisTokenResponse.builder()
-                    .access_token(entity.getAccessToken())
-                    .token_type(entity.getTokenType())
-                    .expires_in(entity.getExpiresIn())
+                    .accessToken(entity.getAccessToken())
+                    .tokenType(entity.getTokenType())
+                    .expiresIn(entity.getExpiresIn())
                     // LocalDateTime을 String으로 변환
                     .accessTokenExpired(entity.getAccessTokenTokenExpired().format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")))
                     .build();
-        }
-        
-        // DTO 필드명 변경에 따른 getter 추가 (서비스 코드 호환성 유지)
-        public String getAccessToken() {
-            return access_token;
         }
     }
 
