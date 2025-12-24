@@ -236,9 +236,8 @@ public class PriceTargetService {
                     .triggerPrice(targetPrice)
                     .currentPrice(targetPrice)
                     .alertType(alertType)
-                                        .eventType(PriceAlertEventDTO.EventType.SET)
+                    .eventType(PriceAlertEventDTO.EventType.SET)
                     .timestamp(LocalDateTime.now())
-                                        .eventType(PriceAlertEventDTO.EventType.CANCELED)
                     .build();
 
             priceAlertEventProducer.publishPriceAlertEvent(event);
@@ -262,6 +261,7 @@ public class PriceTargetService {
                     .triggerPrice(canceledPrice)
                     .currentPrice(null) // 취소 시에는 현재가 불필요
                     .alertType(alertType)
+                    .eventType(PriceAlertEventDTO.EventType.CANCELED)
                     .timestamp(LocalDateTime.now())
                     .build();
 
