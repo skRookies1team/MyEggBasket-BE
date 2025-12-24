@@ -42,11 +42,9 @@ public class AIRecommendationDTO {
         private RecommendationAction actionType;
 
         @NotNull(message = "currentHolding은 필수입니다.")
-        @DecimalMin(value = "0.0", message = "currentHolding은 0 이상이어야 합니다.")
         private BigDecimal currentHolding;
 
         @NotNull(message = "targetHolding은 필수입니다.")
-        @DecimalMin(value = "0.0", message = "targetHolding은 0 이상이어야 합니다.")
         private BigDecimal targetHolding;
 
         @NotNull(message = "targetHoldingPercentage는 필수입니다.")
