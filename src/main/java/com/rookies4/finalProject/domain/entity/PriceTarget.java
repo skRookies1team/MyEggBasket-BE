@@ -36,8 +36,10 @@ public class PriceTarget {
     @JoinColumn(name = "stock_code", nullable = false)
     private Stock stock;
 
-//    상승 목표가 (이 가격 이상이 되면 알림 - 매도 신호)
-//    NULL 가능 (설정하지 않을 수 있음)
+    /**
+    상승 목표가 (이 가격 이상이 되면 알림 - 매도 신호)
+    NULL 가능 (설정하지 않을 수 있음)
+     */
     @Column(name = "upper_target", precision = 19, scale = 2)
     private BigDecimal upperTarget;
 

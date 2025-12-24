@@ -18,49 +18,31 @@ import java.time.LocalDateTime;
 @AllArgsConstructor
 public class PriceAlertEventDTO {
     
-    /**
-     * 이벤트 고유 ID (UUID)
-     */
+    // 이벤트 고유 ID (UUID)
     private String eventId;
     
-    /**
-     * 사용자 ID
-     */
+    // 사용자 ID
     private Long userId;
     
-    /**
-     * 종목 코드
-     */
+    // 종목 코드
     private String stockCode;
     
-    /**
-     * 종목명 (선택)
-     */
+    // 종목명
     private String stockName;
     
-    /**
-     * 설정된 목표가
-     */
+    //  설정된 목표가
     private BigDecimal triggerPrice;
     
-    /**
-     * 현재가 (목표가 만족 시점의 가격)
-     */
+    //  현재가 (목표가 만족 시점의 가격)
     private BigDecimal currentPrice;
     
-    /**
-     * 알림 타입: "UPPER" (상승 목표가 도달) 또는 "LOWER" (하락 목표가 도달)
-     */
+    // 알림 타입: "UPPER" (상승 목표가 도달) 또는 "LOWER" (하락 목표가 도달)
     private AlertType alertType;
     
-    /**
-     * 이벤트 타입: "TRIGGERED" (목표가 도달), "SET" (목표가 설정), "CANCELED" (목표가 취소)
-     */
+    // 이벤트 타입: "TRIGGERED" (목표가 도달), "SET" (목표가 설정), "CANCELED" (목표가 취소)
     private EventType eventType;
     
-    /**
-     * 이벤트 발생 시간
-     */
+    // 이벤트 발생 시간
     private LocalDateTime timestamp;
     
     public enum AlertType {
