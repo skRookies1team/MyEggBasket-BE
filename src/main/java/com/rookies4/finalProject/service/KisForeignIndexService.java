@@ -37,6 +37,7 @@ public class KisForeignIndexService {
             throw new BusinessException(ErrorCode.KIS_API_ERROR, "해외 지수 조회 실패: " + msg);
         }
 
+        log.info("[KIS] 해외 지수 조회 성공 - IndexCode: {}", indexCode);
         return response;
     }
 }

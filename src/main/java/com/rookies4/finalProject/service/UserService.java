@@ -7,10 +7,12 @@ import com.rookies4.finalProject.exception.ErrorCode;
 import com.rookies4.finalProject.repository.UserRepository;
 import com.rookies4.finalProject.util.EncryptionUtil;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+@Slf4j
 @Service
 @RequiredArgsConstructor
 @Transactional
@@ -45,7 +47,9 @@ public class UserService {
                 .account(request.getAccount())
                 .build();
 
-        return UserDTO.UserResponse.fromEntity(userRepository.save(user));
+        User saved = userRepository.save(user);
+        log.info("[User] 회원가입 성공 - UserId: {}, Email: {}", saved.getId(), saved.getEmail());
+        return UserDTO.UserResponse.fromEntity(saved);
     }
 
     // --- 2. Read User (사용자 조회) ---
@@ -53,6 +57,8 @@ public class UserService {
     public UserDTO.UserResponse readUser(Long userId) {
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new BusinessException(ErrorCode.USER_NOT_FOUND, "해당 ID의 사용자를 찾을 수 없습니다."));
+        
+        log.info("[User] 사용자 조회 - UserId: {}, Email: {}", userId, user.getEmail());
         return UserDTO.UserResponse.fromEntity(user);
     }
 
@@ -88,6 +94,7 @@ public class UserService {
             user.setPassword(encodedPassword);
         }
 
+        log.info("[User] 사용자 정보 수정 - UserId: {}", userId);
         return UserDTO.UserResponse.fromEntity(user);
     }
 
@@ -98,5 +105,6 @@ public class UserService {
             throw new BusinessException(ErrorCode.USER_NOT_FOUND, "삭제하려는 사용자를 찾을 수 없습니다.");
         }
         userRepository.deleteById(userId);
+        log.info("[User] 사용자 삭제 - UserId: {}", userId);
     }
 }

@@ -11,12 +11,14 @@ import com.rookies4.finalProject.repository.StockRepository;
 import com.rookies4.finalProject.repository.UserRepository;
 import com.rookies4.finalProject.security.SecurityUtil;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
 import java.util.stream.Collectors;
 
+@Slf4j
 @Service
 @RequiredArgsConstructor
 @Transactional
@@ -44,6 +46,7 @@ public class InterestStockService {
                 .build();
         InterestStock savedInterestStock = interestStockRepository.save(interestStock);
 
+        log.info("[Interest] 관심 종목 추가 - UserId: {}, StockCode: {}, StockName: {}", user.getId(), stock.getStockCode(), stock.getName());
         return InterestStockDTO.InterestStockResponse.fromEntity(savedInterestStock);
     }
 
@@ -71,6 +74,7 @@ public class InterestStockService {
         }
 
         interestStockRepository.delete(interestStock);
+        log.info("[Interest] 관심 종목 삭제 - UserId: {}, StockCode: {}", user.getId(), stockCode);
     }
 
     private User getCurrentUser() {

@@ -104,10 +104,13 @@ public class StockSubscriptionService {
     public List<StockSubscriptionDTO.SubscriptionResponse> getMySubscriptions() {
         User user = getCurrentUser();
         
-        return stockSubscriptionRepository.findByUserOrderBySubscribedAtDesc(user)
+        List<StockSubscriptionDTO.SubscriptionResponse> subscriptions = stockSubscriptionRepository.findByUserOrderBySubscribedAtDesc(user)
                 .stream()
                 .map(StockSubscriptionDTO.SubscriptionResponse::fromEntity)
                 .collect(Collectors.toList());
+        
+        log.info("[Subscription] 내 구독 목록 조회 - UserId: {}, Count: {}", user.getId(), subscriptions.size());
+        return subscriptions;
     }
 
     /**

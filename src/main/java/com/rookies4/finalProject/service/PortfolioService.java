@@ -9,6 +9,7 @@ import com.rookies4.finalProject.repository.PortfolioRepository;
 import com.rookies4.finalProject.repository.UserRepository;
 import com.rookies4.finalProject.security.SecurityUtil;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -16,6 +17,7 @@ import java.math.BigDecimal;
 import java.util.List;
 import java.util.stream.Collectors;
 
+@Slf4j
 @Service
 @RequiredArgsConstructor
 @Transactional
@@ -46,7 +48,9 @@ public class PortfolioService {
                 .riskLevel(request.getRiskLevel())
                 .build();
 
-        return PortfolioDTO.PortfolioResponse.fromEntity(portfolioRepository.save(portfolio));
+        Portfolio saved = portfolioRepository.save(portfolio);
+        log.info("[Portfolio] 포트폴리오 생성 - UserId: {}, PortfolioName: {}", user.getId(), request.getName());
+        return PortfolioDTO.PortfolioResponse.fromEntity(saved);
     }
     
     //2. Portfolio 전체 조회 (현재 사용자의 포트폴리오만)

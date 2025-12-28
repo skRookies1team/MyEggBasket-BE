@@ -59,14 +59,14 @@ public class LoginServiceImpl implements LoginService {
             String decryptedAppKey = encryptionUtil.decrypt(user.getAppkey());
             String reEncryptedAppKey = encryptionUtil.encrypt(decryptedAppKey);
             if (!user.getAppkey().equals(reEncryptedAppKey)) {
-                log.info("사용자 ID {}의 appkey를 GCM으로 마이그레이션합니다.", user.getId());
+                log.debug("[Auth] GCM 마이그레이션 - userId: {}, field: appkey", user.getId());
                 user.setAppkey(reEncryptedAppKey);
             }
 
             String decryptedAppSecret = encryptionUtil.decrypt(user.getAppsecret());
             String reEncryptedAppSecret = encryptionUtil.encrypt(decryptedAppSecret);
             if (!user.getAppsecret().equals(reEncryptedAppSecret)) {
-                log.info("사용자 ID {}의 appsecret을 GCM으로 마이그레이션합니다.", user.getId());
+                log.debug("[Auth] GCM 마이그레이션 - userId: {}, field: appsecret", user.getId());
                 user.setAppsecret(reEncryptedAppSecret);
             }
         } catch (Exception e) {

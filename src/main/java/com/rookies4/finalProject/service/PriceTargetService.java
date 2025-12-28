@@ -188,10 +188,13 @@ public class PriceTargetService {
     public List<PriceTargetDTO.PriceTargetResponse> getMyPriceTargets() {
         User user = getCurrentUser();
 
-        return priceTargetRepository.findByUserOrderByCreatedAtDesc(user)
+        List<PriceTargetDTO.PriceTargetResponse> targets = priceTargetRepository.findByUserOrderByCreatedAtDesc(user)
                 .stream()
                 .map(PriceTargetDTO.PriceTargetResponse::fromEntity)
                 .collect(Collectors.toList());
+        
+        log.info("[PriceTarget] 내 목표가 목록 조회 - UserId: {}, Count: {}", user.getId(), targets.size());
+        return targets;
     }
 
     // 목표가 조회 (종목별)
@@ -204,6 +207,7 @@ public class PriceTargetService {
                 .orElseThrow(() -> new BusinessException(ErrorCode.BUSINESS_RULE_VIOLATION,
                         "해당 종목의 목표가가 설정되지 않았습니다."));
 
+        log.info("[PriceTarget] 목표가 조회 - UserId: {}, StockCode: {}", user.getId(), stockCode);
         return PriceTargetDTO.PriceTargetResponse.fromEntity(priceTarget);
     }
 

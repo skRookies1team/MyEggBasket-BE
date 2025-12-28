@@ -74,7 +74,7 @@ public class KisInvestorTrendService {
                     parseLong(targetOutput.getInstitutionNetBuyQty()),
                     parseLong(targetOutput.getInstitutionNetBuyAmount()) * 1_000_000));
 
-            return KisInvestorTrendDTO.InvestorTrendResponse.builder()
+            KisInvestorTrendDTO.InvestorTrendResponse response = KisInvestorTrendDTO.InvestorTrendResponse.builder()
                     .stockCode(stockCode)
                     .stockName(stockName)
                     .closePrice(parseLong(targetOutput.getClosePrice()))
@@ -82,6 +82,9 @@ public class KisInvestorTrendService {
                     .changeSign(targetOutput.getChangeSign())
                     .investors(investors)
                     .build();
+            
+            log.info("[KIS] 투자자 동향 조회 성공 - UserId: {}, StockCode: {}, StockName: {}", userId, stockCode, stockName);
+            return response;
     }
 
     public List<KisInvestorTrendDTO.InvestorTrendResponse>
