@@ -45,8 +45,8 @@ public class KafkaHealthCheck {
             log.info("Connection Status: OK");
             log.info("Existing Topics: {}", existingTopics);
             
-            // 필요한 토픽 확인
-            checkRequiredTopics(existingTopics);
+            // 필요한 토픽 확인 및 생성
+            checkAndCreateRequiredTopics(adminClient, existingTopics);
             
             log.info("========================================");
             
@@ -65,9 +65,9 @@ public class KafkaHealthCheck {
     }
 
     /**
-     * 필요한 토픽이 존재하는지 확인
+     * 필요한 토픽이 존재하는지 확인하고, 없으면 생성
      */
-    private void checkRequiredTopics(Set<String> existingTopics) {
+    private void checkAndCreateRequiredTopics(AdminClient adminClient, Set<String> existingTopics) {
         String[] requiredTopics = {
                 "stock-ticks",
                 "price-alert-events",
@@ -76,13 +76,19 @@ public class KafkaHealthCheck {
         
         log.info("Checking required Kafka topics...");
         
-        for (String topic : requiredTopics) {
-            if (existingTopics.contains(topic)) {
-                log.info("✓ Topic '{}' exists", topic);
+        for (String topicName : requiredTopics) {
+            if (existingTopics.contains(topicName)) {
+                log.info("✓ Topic '{}' exists", topicName);
             } else {
-                log.warn("✗ Topic '{}' does NOT exist - please create it manually", topic);
-                log.warn("  Command: kafka-topics.sh --create --topic {} --bootstrap-server {} --partitions 3 --replication-factor 1",
-                        topic, bootstrapServers);
+                log.warn("✗ Topic '{}' does NOT exist - creating...", topicName);
+                try {
+                    // 토픽 생성: partitions=3, replication-factor=1
+                    NewTopic newTopic = new NewTopic(topicName, 3, (short) 1);
+                    adminClient.createTopics(Arrays.asList(newTopic)).all().get();
+                    log.info("✓ Topic '{}' created successfully", topicName);
+                } catch (Exception e) {
+                    log.error("✗ Failed to create topic '{}': {}", topicName, e.getMessage());
+                }
             }
         }
     }
