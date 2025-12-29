@@ -74,12 +74,12 @@ public class SubscriptionEventProducer {
             
             future.whenComplete((result, ex) -> {
                 if (ex == null) {
-                    log.info("Subscription event published successfully - EventType: {}, UserId: {}, StockCode: {}", 
+                    log.info("구독 이벤트 발행 성공 - EventType: {}, UserId: {}, StockCode: {}", 
                             event.getEventType(), 
                             event.getUserId(), 
                             event.getStockCode());
                 } else {
-                    log.error("Failed to publish subscription event - EventType: {}, UserId: {}, StockCode: {}, Error: {}", 
+                    log.error("구독 이벤트 발행 실패 - EventType: {}, UserId: {}, StockCode: {}, Error: {}", 
                             event.getEventType(), 
                             event.getUserId(), 
                             event.getStockCode(),
@@ -88,7 +88,7 @@ public class SubscriptionEventProducer {
             });
             
         } catch (Exception e) {
-            log.error("Exception occurred while publishing subscription event - EventType: {}, UserId: {}, StockCode: {}, Error: {}", 
+            log.error("구독 이벤트 발행 중 예외 발생 - EventType: {}, UserId: {}, StockCode: {}, Error: {}", 
                     event.getEventType(), 
                     event.getUserId(), 
                     event.getStockCode(),

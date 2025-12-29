@@ -39,15 +39,12 @@ public class PriceAlertEventProducer {
             
             future.whenComplete((result, ex) -> {
                 if (ex == null) {
-                    log.info("Price alert event published successfully - EventId: {}, UserId: {}, StockCode: {}, AlertType: {}, TriggerPrice: {}, CurrentPrice: {}", 
+                    log.info("가격 알림 이벤트 발행 성공 - EventId: {}, UserId: {}, StockCode: {}", 
                             event.getEventId(), 
                             event.getUserId(), 
-                            event.getStockCode(),
-                            event.getAlertType(),
-                            event.getTriggerPrice(),
-                            event.getCurrentPrice());
+                            event.getStockCode());
                 } else {
-                    log.error("Failed to publish price alert event - EventId: {}, UserId: {}, StockCode: {}, Error: {}", 
+                    log.error("가격 알림 이벤트 발행 실패 - EventId: {}, UserId: {}, StockCode: {}, Error: {}", 
                             event.getEventId(), 
                             event.getUserId(), 
                             event.getStockCode(),
@@ -56,7 +53,7 @@ public class PriceAlertEventProducer {
             });
             
         } catch (Exception e) {
-            log.error("Exception occurred while publishing price alert event - EventId: {}, Error: {}", 
+            log.error("가격 알림 이벤트 발행 중 예외 발생 - EventId: {}, Error: {}", 
                     event.getEventId(), e.getMessage(), e);
         }
     }

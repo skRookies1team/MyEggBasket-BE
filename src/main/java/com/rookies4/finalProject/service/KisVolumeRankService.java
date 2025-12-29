@@ -30,7 +30,7 @@ public class KisVolumeRankService {
      * @return 거래량 순위 DTO 리스트
      */
     public List<VolumeRankResponseDTO> getVolumeRank(User user) {
-        log.info("KIS 거래량 순위 조회 요청: userId={}", user.getId());
+        log.info("[KIS] 거래량 순위 조회 시작 - UserId: {}", user.getId());
 
         // KisApiClient를 사용한 간결한 API 호출
         KisApiRequest request = KisApiRequest.builder()
@@ -75,7 +75,7 @@ public class KisVolumeRankService {
                 .map(this::transformToResponseDTO)
                 .collect(Collectors.toList());
 
-        log.info("KIS 거래량 순위 조회 및 변환 성공: userId={}, count={}", user.getId(), result.size());
+        log.info("[KIS] 거래량 순위 조회 성공 - UserId: {}, Count: {}", user.getId(), result.size());
 
         return result;
     }

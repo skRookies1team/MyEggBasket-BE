@@ -35,6 +35,7 @@ public class KisKoreaIndexService {
             throw new BusinessException(ErrorCode.KIS_API_ERROR, "국내 지수 조회 실패: " + msg);
         }
 
+        log.info("[KIS] 국내 지수 조회 성공 - IndexCode: {}", indexCode);
         return response;
     }
 }

@@ -67,8 +67,6 @@ public class PriceTargetService {
         }
 
         PriceTarget saved = priceTargetRepository.save(priceTarget);
-        log.info("Upper target set - UserId: {}, StockCode: {}, TargetPrice: {}",
-                user.getId(), stock.getStockCode(), request.getTargetPrice());
 
         // Kafka 이벤트 발행
         publishPriceAlertEvent(user.getId(), stock.getStockCode(), stock.getName(),
@@ -109,8 +107,6 @@ public class PriceTargetService {
         }
 
         PriceTarget saved = priceTargetRepository.save(priceTarget);
-        log.info("Lower target set - UserId: {}, StockCode: {}, TargetPrice: {}",
-                user.getId(), stock.getStockCode(), request.getTargetPrice());
 
         // Kafka 이벤트 발행
         publishPriceAlertEvent(user.getId(), stock.getStockCode(), stock.getName(),
@@ -143,7 +139,6 @@ public class PriceTargetService {
                     user.getId(), stockCode);
         } else {
             priceTargetRepository.save(priceTarget);
-            log.info("Upper target cleared - UserId: {}, StockCode: {}", user.getId(), stockCode);
         }
 
         // Kafka 이벤트 발행 (취소 알림)
@@ -175,7 +170,6 @@ public class PriceTargetService {
                     user.getId(), stockCode);
         } else {
             priceTargetRepository.save(priceTarget);
-            log.info("Lower target cleared - UserId: {}, StockCode: {}", user.getId(), stockCode);
         }
 
         // Kafka 이벤트 발행 (취소 알림)
@@ -188,10 +182,13 @@ public class PriceTargetService {
     public List<PriceTargetDTO.PriceTargetResponse> getMyPriceTargets() {
         User user = getCurrentUser();
 
-        return priceTargetRepository.findByUserOrderByCreatedAtDesc(user)
+        List<PriceTargetDTO.PriceTargetResponse> targets = priceTargetRepository.findByUserOrderByCreatedAtDesc(user)
                 .stream()
                 .map(PriceTargetDTO.PriceTargetResponse::fromEntity)
                 .collect(Collectors.toList());
+        
+        log.info("[PriceTarget] 내 목표가 목록 조회 성공 - UserId: {}, Count: {}", user.getId(), targets.size());
+        return targets;
     }
 
     // 목표가 조회 (종목별)
@@ -204,6 +201,7 @@ public class PriceTargetService {
                 .orElseThrow(() -> new BusinessException(ErrorCode.BUSINESS_RULE_VIOLATION,
                         "해당 종목의 목표가가 설정되지 않았습니다."));
 
+        log.info("[PriceTarget] 목표가 조회 성공 - UserId: {}, StockCode: {}", user.getId(), stockCode);
         return PriceTargetDTO.PriceTargetResponse.fromEntity(priceTarget);
     }
 
@@ -241,10 +239,10 @@ public class PriceTargetService {
                     .build();
 
             priceAlertEventProducer.publishPriceAlertEvent(event);
-            log.info("Price target event published - UserId: {}, StockCode: {}, AlertType: {}, TargetPrice: {}",
+            log.info("[Price Alert] 목표가 설정 성공 - UserId: {}, StockCode: {}, AlertType: {}, TargetPrice: {}",
                     userId, stockCode, alertType, targetPrice);
         } catch (Exception e) {
-            log.error("Failed to publish price target event - UserId: {}, StockCode: {}, Error: {}",
+            log.error("[Price Alert] 목표가 설정 실패 - UserId: {}, StockCode: {}, Error: {}",
                     userId, stockCode, e.getMessage(), e);
         }
     }
@@ -266,10 +264,10 @@ public class PriceTargetService {
                     .build();
 
             priceAlertEventProducer.publishPriceAlertEvent(event);
-            log.info("Price target cancel event published - UserId: {}, StockCode: {}, AlertType: {}, CanceledPrice: {}",
-                    userId, stockCode, alertType, canceledPrice);
+            log.info("[Price Alert] 목표가 취소 성공 - UserId: {}, StockCode: {}, AlertType: {}",
+                    userId, stockCode, alertType);
         } catch (Exception e) {
-            log.error("Failed to publish price target cancel event - UserId: {}, StockCode: {}, Error: {}",
+            log.error("[Price Alert] 목표가 취소 실패 - UserId: {}, StockCode: {}, Error: {}",
                     userId, stockCode, e.getMessage(), e);
         }
     }

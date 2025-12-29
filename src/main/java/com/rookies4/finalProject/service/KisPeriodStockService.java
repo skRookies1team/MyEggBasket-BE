@@ -67,11 +67,14 @@ public class KisPeriodStockService {
                 .map(this::transformToChartData)
                 .collect(Collectors.toList());
 
-        return KisPeriodStockDTO.ChartResponse.builder()
+        KisPeriodStockDTO.ChartResponse response = KisPeriodStockDTO.ChartResponse.builder()
                 .stockCode(stockCode)
                 .period(period)
                 .data(chartData)
                 .build();
+        
+        log.info("[KIS] 차트 데이터 조회 성공 - StockCode: {}, Period: {}, DataCount: {}", stockCode, period, chartData.size());
+        return response;
     }
 
     private KisPeriodStockDTO.ChartData transformToChartData(Map<String, Object> output) {

@@ -63,7 +63,7 @@ public class KisStockService {
 
         BigDecimal currentPrice = parseBigDecimal(output.get("stck_prpr"));
 
-        return CurrentPriceDTO.builder()
+        CurrentPriceDTO result = CurrentPriceDTO.builder()
                 .stockCode(stockCode)
                 .stockName(stockName)
                 .currentPrice(currentPrice)
@@ -77,6 +77,9 @@ public class KisStockService {
                 .closePrice(currentPrice.doubleValue())
                 .updatedAt(java.time.LocalDateTime.now())
                 .build();
+        
+        log.info("[KIS] 현재가 조회 성공 - StockCode: {}, StockName: {}, Price: {}", stockCode, stockName, currentPrice);
+        return result;
     }
 
     private void validateStockCodeFormat(String stockCode) {

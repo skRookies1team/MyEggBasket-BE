@@ -65,7 +65,7 @@ public class StockSubscriptionService {
         // Kafka 이벤트 발행: StockCollector에게 구독 시작 알림
         subscriptionEventProducer.publishSubscribeEvent(user.getId(), stock.getStockCode());
         
-        log.info("Stock subscribed - UserId: {}, StockCode: {}, StockName: {}", 
+        log.info("[StockSubscription] 종목 구독 성공 - UserId: {}, StockCode: {}, StockName: {}", 
                 user.getId(), stock.getStockCode(), stock.getName());
 
         return StockSubscriptionDTO.SubscriptionResponse.fromEntity(saved);
@@ -94,7 +94,7 @@ public class StockSubscriptionService {
         // (다른 사용자가 구독 중이면 StockCollector는 계속 수집)
         subscriptionEventProducer.publishUnsubscribeEvent(user.getId(), stockCode);
         
-        log.info("Stock unsubscribed - UserId: {}, StockCode: {}", user.getId(), stockCode);
+        log.info("[StockSubscription] 종목 구독 해지 성공 - UserId: {}, StockCode: {}", user.getId(), stockCode);
     }
 
     /**
@@ -104,10 +104,13 @@ public class StockSubscriptionService {
     public List<StockSubscriptionDTO.SubscriptionResponse> getMySubscriptions() {
         User user = getCurrentUser();
         
-        return stockSubscriptionRepository.findByUserOrderBySubscribedAtDesc(user)
+        List<StockSubscriptionDTO.SubscriptionResponse> subscriptions = stockSubscriptionRepository.findByUserOrderBySubscribedAtDesc(user)
                 .stream()
                 .map(StockSubscriptionDTO.SubscriptionResponse::fromEntity)
                 .collect(Collectors.toList());
+        
+        log.info("[Subscription] 내 구독 목록 조회 - UserId: {}, Count: {}", user.getId(), subscriptions.size());
+        return subscriptions;
     }
 
     /**

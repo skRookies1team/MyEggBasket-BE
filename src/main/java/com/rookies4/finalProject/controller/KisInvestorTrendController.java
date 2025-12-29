@@ -35,7 +35,7 @@ public class KisInvestorTrendController {
         }
 
         KisInvestorTrendDTO.InvestorTrendResponse response =
-                kisInvestorTrendService.getInvestorTrend(stockCode, userId);
+                kisInvestorTrendService.getInvestorTrendSingle(stockCode, userId);
 
         return ResponseEntity.ok(response);
     }
