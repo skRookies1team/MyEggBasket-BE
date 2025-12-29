@@ -49,7 +49,7 @@ public class PortfolioService {
                 .build();
 
         Portfolio saved = portfolioRepository.save(portfolio);
-        log.info("[Portfolio] 포트폴리오 생성 - UserId: {}, PortfolioName: {}", user.getId(), request.getName());
+        log.info("[Portfolio] 포트폴리오 생성 성공 - UserId: {}, PortfolioName: {}", user.getId(), request.getName());
         return PortfolioDTO.PortfolioResponse.fromEntity(saved);
     }
     
@@ -64,10 +64,13 @@ public class PortfolioService {
         User user = userRepository.findById(currentUserId)
                 .orElseThrow(() -> new BusinessException(ErrorCode.USER_NOT_FOUND, "로그인한 사용자를 찾을 수 없습니다."));
 
-        return portfolioRepository.findByUser(user)
+        List<PortfolioDTO.PortfolioResponse> portfolios = portfolioRepository.findByUser(user)
                 .stream()
                 .map(PortfolioDTO.PortfolioResponse::fromEntity)
                 .collect(Collectors.toList());
+        
+        log.info("[Portfolio] 포트폴리오 목록 조회 성공 - UserId: {}, Count: {}", user.getId(), portfolios.size());
+        return portfolios;
     }
 
     //3. Portfolio 상세 조회
@@ -95,6 +98,7 @@ public class PortfolioService {
             });
         }
         
+        log.info("[Portfolio] 포트폴리오 상세 조회 성공 - UserId: {}, PortfolioId: {}", portfolio.getUser().getId(), portfolioId);
         return PortfolioDTO.PortfolioResponse.fromEntity(portfolio);
     }
     
@@ -128,6 +132,7 @@ public class PortfolioService {
             portfolio.setRiskLevel(updateRequest.getRiskLevel());
         }
 
+        log.info("[Portfolio] 포트폴리오 수정 성공 - UserId: {}, PortfolioId: {}", portfolio.getUser().getId(), portfolioId);
         return PortfolioDTO.PortfolioResponse.fromEntity(portfolio);
     }
     
@@ -139,6 +144,7 @@ public class PortfolioService {
         // 권한 확인: 포트폴리오 소유자만 삭제 가능
         validatePortfolioOwnership(portfolio);
         
+        log.info("[Portfolio] 포트폴리오 삭제 성공 - UserId: {}, PortfolioId: {}", portfolio.getUser().getId(), portfolioId);
         portfolioRepository.deleteById(portfolioId);
     }
     
@@ -151,6 +157,7 @@ public class PortfolioService {
         // 권한 확인: 포트폴리오 소유자만 조회 가능
         validatePortfolioOwnership(portfolio);
         
+        log.info("[Portfolio] 포트폴리오 보유종목 조회 성공 - UserId: {}, PortfolioId: {}", portfolio.getUser().getId(), portfolioId);
         return PortfolioDTO.PortfolioHoldingResponse.fromEntity(portfolio);
     }
     

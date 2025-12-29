@@ -43,48 +43,52 @@ public class KisInvestorTrendService {
             throw new BusinessException(ErrorCode.KIS_API_ERROR, "투자자 동향 조회 실패: " + msg);
         }
 
-            List<KisInvestorTrendDTO.KisOutput> outputList = body.getOutput();
-            KisInvestorTrendDTO.KisOutput targetOutput;
+        List<KisInvestorTrendDTO.KisOutput> outputList = body.getOutput();
+        KisInvestorTrendDTO.KisOutput targetOutput;
 
-            // 장중(16시 이전)이면 전일 데이터(index 1), 장마감 후엔 당일 데이터(index 0)
-            LocalTime now = LocalTime.now();
-            LocalTime marketCloseTime = LocalTime.of(16, 0);
+        // 장중(16시 이전)이면 전일 데이터(index 1), 장마감 후엔 당일 데이터(index 0)
+        LocalTime now = LocalTime.now();
+        LocalTime marketCloseTime = LocalTime.of(16, 0);
 
-            if (now.isBefore(marketCloseTime) && outputList.size() > 1) {
-                targetOutput = outputList.get(1);  // 전일 데이터
-            } else {
-                targetOutput = outputList.get(0);  // 당일 데이터
-            }
+        if (now.isBefore(marketCloseTime) && outputList.size() > 1) {
+            targetOutput = outputList.get(1);  // 전일 데이터
+        } else {
+            targetOutput = outputList.get(0);  // 당일 데이터
+        }
 
-            String stockName = stockRepository.findById(stockCode)
-                    .map(Stock::getName)
-                    .orElse(targetOutput.getStockName());
+        String stockName = stockRepository.findById(stockCode)
+                .map(Stock::getName)
+                .orElse(targetOutput.getStockName());
 
-            List<KisInvestorTrendDTO.InvestorInfo> investors = new ArrayList<>();
+        List<KisInvestorTrendDTO.InvestorInfo> investors = new ArrayList<>();
 
-            investors.add(new KisInvestorTrendDTO.InvestorInfo("개인",
-                    parseLong(targetOutput.getPersonalNetBuyQty()),
-                    parseLong(targetOutput.getPersonalNetBuyAmount()) * 1_000_000));
+        investors.add(new KisInvestorTrendDTO.InvestorInfo("개인",
+                parseLong(targetOutput.getPersonalNetBuyQty()),
+                parseLong(targetOutput.getPersonalNetBuyAmount()) * 1_000_000));
 
-            investors.add(new KisInvestorTrendDTO.InvestorInfo("외국인",
-                    parseLong(targetOutput.getForeignerNetBuyQty()),
-                    parseLong(targetOutput.getForeignerNetBuyAmount()) * 1_000_000));
+        investors.add(new KisInvestorTrendDTO.InvestorInfo("외국인",
+                parseLong(targetOutput.getForeignerNetBuyQty()),
+                parseLong(targetOutput.getForeignerNetBuyAmount()) * 1_000_000));
 
-            investors.add(new KisInvestorTrendDTO.InvestorInfo("기관",
-                    parseLong(targetOutput.getInstitutionNetBuyQty()),
-                    parseLong(targetOutput.getInstitutionNetBuyAmount()) * 1_000_000));
+        investors.add(new KisInvestorTrendDTO.InvestorInfo("기관",
+                parseLong(targetOutput.getInstitutionNetBuyQty()),
+                parseLong(targetOutput.getInstitutionNetBuyAmount()) * 1_000_000));
 
-            KisInvestorTrendDTO.InvestorTrendResponse response = KisInvestorTrendDTO.InvestorTrendResponse.builder()
-                    .stockCode(stockCode)
-                    .stockName(stockName)
-                    .closePrice(parseLong(targetOutput.getClosePrice()))
-                    .changeAmount(parseLong(targetOutput.getChangeAmount()))
-                    .changeSign(targetOutput.getChangeSign())
-                    .investors(investors)
-                    .build();
-            
-            log.info("[KIS] 투자자 동향 조회 성공 - UserId: {}, StockCode: {}, StockName: {}", userId, stockCode, stockName);
-            return response;
+        return KisInvestorTrendDTO.InvestorTrendResponse.builder()
+                .stockCode(stockCode)
+                .stockName(stockName)
+                .closePrice(parseLong(targetOutput.getClosePrice()))
+                .changeAmount(parseLong(targetOutput.getChangeAmount()))
+                .changeSign(targetOutput.getChangeSign())
+                .investors(investors)
+                .build();
+    }
+
+    public KisInvestorTrendDTO.InvestorTrendResponse getInvestorTrendSingle(String stockCode, Long userId) {
+        KisInvestorTrendDTO.InvestorTrendResponse response = getInvestorTrend(stockCode, userId);
+        log.info("[KIS] 투자자 동향 조회 성공 - UserId: {}, StockCode: {}, StockName: {}", 
+                userId, response.getStockCode(), response.getStockName());
+        return response;
     }
 
     public List<KisInvestorTrendDTO.InvestorTrendResponse>
@@ -98,17 +102,22 @@ public class KisInvestorTrendService {
                 "066575", "033780", "003550", "003555", "310200"
         );
 
-        return tickers.stream()
-                .map(code -> {
-                    try {
-                        return getInvestorTrend(code, userId);
-                    } catch (Exception e) {
-                        log.warn("시장 투자자 동향 조회 실패: {}", code, e);
-                        return null;
-                    }
-                })
-                .filter(Objects::nonNull)
-                .toList();
+        List<KisInvestorTrendDTO.InvestorTrendResponse> results = new ArrayList<>();
+        for (String code : tickers) {
+            try {
+                results.add(getInvestorTrend(code, userId));
+                Thread.sleep(100); // 100ms 딜레이로 rate limit 방지
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+                log.warn("시장 투자자 동향 조회 중단: {}", code);
+                break;
+            } catch (Exception e) {
+                log.warn("시장 투자자 동향 조회 실패: {}", code);
+            }
+        }
+        
+        log.info("[KIS] 투자자 동향 일괄 조회 성공 - UserId: {}, Count: {}", userId, results.size());
+        return results;
     }
 
     private Long parseLong(Object value) {
