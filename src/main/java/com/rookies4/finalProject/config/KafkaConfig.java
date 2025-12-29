@@ -1,27 +1,21 @@
 package com.rookies4.finalProject.config;
 
 import com.rookies4.finalProject.dto.kafka.PriceAlertEventDTO;
-import com.rookies4.finalProject.dto.kafka.StockTickDTO;
 import com.rookies4.finalProject.dto.kafka.SubscriptionEventDTO;
-import org.apache.kafka.clients.consumer.ConsumerConfig;
 import org.apache.kafka.clients.producer.ProducerConfig;
-import org.apache.kafka.common.serialization.StringDeserializer;
 import org.apache.kafka.common.serialization.StringSerializer;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
-import org.springframework.kafka.config.ConcurrentKafkaListenerContainerFactory;
 import org.springframework.kafka.core.*;
-import org.springframework.kafka.support.serializer.JsonDeserializer;
 import org.springframework.kafka.support.serializer.JsonSerializer;
 
 import java.util.HashMap;
 import java.util.Map;
 
 /**
- * Kafka Consumer/Producer 설정
+ * Kafka Producer 설정
  * 
- * Consumer: stock-ticks 토픽에서 실시간 체결 데이터 수신
  * Producer: price-alert-events, subscription-events 토픽으로 이벤트 발행
  */
 @Configuration
@@ -29,42 +23,6 @@ public class KafkaConfig {
 
     @Value("${spring.kafka.bootstrap-servers}")
     private String bootstrapServers;
-
-    @Value("${spring.kafka.consumer.group-id}")
-    private String groupId;
-
-    // ==================== Consumer Configuration ====================
-
-    /**
-     * StockTickDTO Consumer 설정
-     * stock-ticks 토픽을 구독합니다.
-     */
-    @Bean
-    public ConsumerFactory<String, StockTickDTO> stockTickConsumerFactory() {
-        Map<String, Object> config = new HashMap<>();
-        config.put(ConsumerConfig.BOOTSTRAP_SERVERS_CONFIG, bootstrapServers);
-        config.put(ConsumerConfig.GROUP_ID_CONFIG, groupId);
-        config.put(ConsumerConfig.KEY_DESERIALIZER_CLASS_CONFIG, StringDeserializer.class);
-        config.put(ConsumerConfig.VALUE_DESERIALIZER_CLASS_CONFIG, JsonDeserializer.class);
-        config.put(JsonDeserializer.TRUSTED_PACKAGES, "*");
-        config.put(JsonDeserializer.VALUE_DEFAULT_TYPE, StockTickDTO.class.getName());
-        config.put(ConsumerConfig.AUTO_OFFSET_RESET_CONFIG, "earliest");
-        config.put(ConsumerConfig.ENABLE_AUTO_COMMIT_CONFIG, true);
-        
-        return new DefaultKafkaConsumerFactory<>(
-                config,
-                new StringDeserializer(),
-                new JsonDeserializer<>(StockTickDTO.class, false)
-        );
-    }
-
-    @Bean
-    public ConcurrentKafkaListenerContainerFactory<String, StockTickDTO> stockTickKafkaListenerContainerFactory() {
-        ConcurrentKafkaListenerContainerFactory<String, StockTickDTO> factory =
-                new ConcurrentKafkaListenerContainerFactory<>();
-        factory.setConsumerFactory(stockTickConsumerFactory());
-        return factory;
-    }
 
     // ==================== Producer Configuration ====================
 

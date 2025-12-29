@@ -69,7 +69,6 @@ public class KafkaHealthCheck {
      */
     private void checkAndCreateRequiredTopics(AdminClient adminClient, Set<String> existingTopics) {
         String[] requiredTopics = {
-                "stock-ticks",
                 "price-alert-events",
                 "subscription-events"
         };
