@@ -23,6 +23,7 @@ import org.springframework.web.client.RestTemplate;
 
 import java.time.LocalDateTime;
 import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 
 @Slf4j
 @Service
@@ -33,26 +34,58 @@ public class KisAuthService {
     private final KisAuthRepository kisAuthRepository;
     private final EncryptionUtil encryptionUtil;
 
+    // 인메모리 토큰 캐시 (Key: UserId, Value: TokenInfo)
+    // DB 조회 부하를 줄이기 위해 사용
+    private final Map<Long, CachedTokenInfo> tokenCache = new ConcurrentHashMap<>();
+
+    private record CachedTokenInfo(KisAuthTokenDTO.KisTokenResponse response, LocalDateTime expirationTime) {
+        boolean isValid() {
+            // 만료 5분 전까지를 유효한 것으로 간주
+            return LocalDateTime.now().plusMinutes(5).isBefore(expirationTime);
+        }
+    }
+
     /**
      * REST API용 accessToken
      */
     @Transactional(propagation = Propagation.REQUIRES_NEW)
     public KisAuthTokenDTO.KisTokenResponse issueToken(boolean useVirtualServer, User user) {
+        // 1. 메모리 캐시 확인 (DB 부하 방지)
+        if (tokenCache.containsKey(user.getId())) {
+            CachedTokenInfo cached = tokenCache.get(user.getId());
+            if (cached.isValid()) {
+                if (log.isDebugEnabled()) {
+                    log.debug("[KIS Auth] 메모리 캐시 토큰 사용 - userId: {}", user.getId());
+                }
+                return cached.response();
+            } else {
+                // 만료된 경우 캐시 제거
+                tokenCache.remove(user.getId());
+            }
+        }
+
+        // 2. DB 조회 및 갱신 로직 (기존 로직 유지하되 캐시 업데이트 추가)
         return kisAuthRepository.findByUser(user)
                 .filter(token -> !isTokenExpired(token))
                 .map(token -> {
-                    // 재사용 시에는 DEBUG 레벨로만 로깅
                     if (log.isDebugEnabled()) {
-                        log.debug("[KIS Auth] 토큰 재사용 - userId: {}", user.getId());
+                        log.debug("[KIS Auth] DB 토큰 재사용 - userId: {}", user.getId());
                     }
-                    return KisAuthTokenDTO.KisTokenResponse.fromEntity(token);
+                    KisAuthTokenDTO.KisTokenResponse response = KisAuthTokenDTO.KisTokenResponse.fromEntity(token);
+
+                    // DB에서 가져온 유효 토큰을 메모리 캐시에 등록
+                    tokenCache.put(user.getId(), new CachedTokenInfo(response, token.getAccessTokenTokenExpired()));
+
+                    return response;
                 })
                 .orElseGet(() -> {
-                    log.info("[KIS Auth] 신규 토큰 발급 - userId: {}", user.getId());
+                    log.info("[KIS Auth] 신규 토큰 발급 (API 요청) - userId: {}", user.getId());
                     KisAuthTokenDTO.KisTokenRequest tokenRequest = buildTokenRequest(user);
-                    KisAuthTokenDTO.KisTokenResponse response =
-                            requestNewToken(useVirtualServer, tokenRequest);
+                    KisAuthTokenDTO.KisTokenResponse response = requestNewToken(useVirtualServer, tokenRequest);
+
+                    // DB 저장 및 캐시 등록
                     saveOrUpdateToken(user, response);
+
                     return response;
                 });
     }
@@ -91,6 +124,9 @@ public class KisAuthService {
      */
     @Transactional(propagation = Propagation.REQUIRES_NEW)
     public void expireToken(User user) {
+        // 메모리 캐시 즉시 제거
+        tokenCache.remove(user.getId());
+
         kisAuthRepository.findByUser(user).ifPresent(token -> {
             log.info("[KIS Auth] 토큰 강제 만료 - userId: {}", user.getId());
             token.setAccessTokenTokenExpired(LocalDateTime.now().minusMinutes(1));
@@ -205,5 +241,9 @@ public class KisAuthService {
         );
 
         kisAuthRepository.save(token);
+
+        // 캐시에도 저장 (중요: Entity가 업데이트된 후의 만료 시간을 사용해야 정확함)
+        // updateToken 내부 로직에 따라 만료 시간이 설정되었으므로, token 객체에서 시간 정보를 가져옴
+        tokenCache.put(user.getId(), new CachedTokenInfo(response, token.getAccessTokenTokenExpired()));
     }
 }
