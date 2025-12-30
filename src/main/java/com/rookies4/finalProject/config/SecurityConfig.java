@@ -65,11 +65,12 @@ public class SecurityConfig {
                                 "/api/app/auth/login",
                                 "/api/users",
                                 "/api/auth/**",
-                                "/api/app/stocks/**",// [추가됨] 주식 관련 API 허용
+                                "/api/app/stocks/**",
                                 "/api/app/kis/stock/**",
+                                "/api/app/kis/trade/**",
                                 "/api/app/kis/rank/**",
                                 "/api/app/subscriptions/active-codes",
-                                "/api/test/**", // 테스트 API 허용
+                                "/api/test/**",
                                 "/ws/**", "/ws"
                         ).permitAll()
                         .requestMatchers("/swagger-ui/**", "/v3/api-docs/**", "/swagger-resources/**").permitAll()
