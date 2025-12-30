@@ -48,6 +48,7 @@ public class KisStockOrderService {
         String tradeId = resolveTradeId(useVirtualServer, request.getOrderType());
 
         // Body 구성
+        
         Map<String, String> body = new HashMap<>();
         body.put("CANO", user.getAccount());
         body.put("ACNT_PRDT_CD", "01");
@@ -64,6 +65,54 @@ public class KisStockOrderService {
                 .build();
 
         log.info("### KIS 주문 요청 ({}) ###", useVirtualServer ? "모의" : "실전");
+        log.info("tr_id: {}", tradeId);
+
+        return kisApiClient.post(user.getId(), apiRequest, KisStockOrderDTO.OrderResponse.class);
+    }
+
+    /**
+     * KIS 지정가 주문 (매수 / 매도)
+     */
+    public KisStockOrderDTO.OrderResponse orderStockWithLimitPrice(
+            boolean useVirtualServer,
+            User user,
+            KisStockOrderDTO.KisStockLimitPriceOrderRequest request
+    ) {
+        if (user == null) {
+            throw new BusinessException(ErrorCode.USER_NOT_FOUND, "사용자 정보가 없습니다.");
+        }
+
+        // 요청값 검증
+        Integer qty = request.getQuantity();
+        Integer limitPrice = request.getLimitPrice();
+
+        if (qty == null || qty <= 0) {
+            throw new BusinessException(ErrorCode.VALIDATION_ERROR, "주문 수량이 올바르지 않습니다.");
+        }
+        if (limitPrice == null || limitPrice <= 0) {
+            throw new BusinessException(ErrorCode.VALIDATION_ERROR, "지정가가 올바르지 않습니다.");
+        }
+
+        // trade_id 결정
+        String tradeId = resolveTradeId(useVirtualServer, request.getOrderType());
+
+        // Body 구성
+        Map<String, String> body = new HashMap<>();
+        body.put("CANO", user.getAccount());
+        body.put("ACNT_PRDT_CD", "01");
+        body.put("PDNO", request.getStockCode());
+        body.put("ORD_DVSN", "00");  // 지정가: 00
+        body.put("ORD_QTY", String.valueOf(qty));
+        body.put("ORD_UNPR", String.valueOf(limitPrice));
+
+        KisApiRequest apiRequest = KisApiRequest.builder()
+                .path("/uapi/domestic-stock/v1/trading/order-cash")
+                .trId(tradeId)
+                .body(body)
+                .useVirtualServer(useVirtualServer)
+                .build();
+
+        log.info("### KIS 지정가 주문 요청 ({}) ###", useVirtualServer ? "모의" : "실전");
         log.info("tr_id: {}", tradeId);
 
         return kisApiClient.post(user.getId(), apiRequest, KisStockOrderDTO.OrderResponse.class);
