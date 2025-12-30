@@ -61,4 +61,16 @@ public class KisStockOrderDTO {
         private Integer price;                 // 주문단가
         private TriggerSource triggerSource;   // MANUAL / AI
     }
+
+    @Data
+    @NoArgsConstructor
+    @AllArgsConstructor
+    @Builder
+    public static class KisStockLimitPriceOrderRequest {
+        private String stockCode;              // 종목코드
+        private TransactionType orderType;     // BUY / SELL
+        private Integer quantity;              // 주문수량
+        private Integer limitPrice;            // 지정가(주문단가)
+        private TriggerSource triggerSource;   // MANUAL / AI
+    }
 }

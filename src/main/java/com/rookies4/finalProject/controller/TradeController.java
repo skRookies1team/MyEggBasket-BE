@@ -50,6 +50,27 @@ public class TradeController {
         return ResponseEntity.ok(kisStockOrderService.orderStock(useVirtualServer, user, orderRequest));
     }
 
+    // 1-1. 지정가 매수/매도 주문
+    @PostMapping("/limit-price")
+    public ResponseEntity<KisStockOrderDTO.OrderResponse> orderStockWithLimitPrice(
+            @RequestParam(name = "virtual", defaultValue = "false") boolean useVirtualServer,
+            @RequestBody KisStockOrderDTO.KisStockLimitPriceOrderRequest orderRequest){
+
+        secureLogger.safeLog("KIS 지정가 주문 요청 (Controller) - virtual: " + useVirtualServer, orderRequest);
+
+        Long currentUserId = SecurityUtil.getCurrentUserId();
+        if (currentUserId == null) {
+            throw new BusinessException(ErrorCode.AUTH_ACCESS_DENIED, "로그인이 필요합니다.");
+        }
+
+        // 사용자 조회
+        User user = userRepository.findById(currentUserId)
+                .orElseThrow(() -> new BusinessException(ErrorCode.USER_NOT_FOUND,
+                        "로그인한 사용자를 찾을 수 없습니다."));
+
+        return ResponseEntity.ok(kisStockOrderService.orderStockWithLimitPrice(useVirtualServer, user, orderRequest));
+    }
+
     // 2. 거래/주문 내역 조회 (로그인 유저 기준)
     @GetMapping("/history")
     public ResponseEntity<List<TransactionDTO.Response>> getTradeHistory(
