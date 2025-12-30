@@ -68,6 +68,7 @@ public class SecurityConfig {
                                 "/api/app/stocks/**",// [추가됨] 주식 관련 API 허용
                                 "/api/app/kis/stock/**",
                                 "/api/app/kis/rank/**",
+                                "/api/app/subscriptions/active-codes",
                                 "/api/test/**", // 테스트 API 허용
                                 "/ws/**", "/ws"
                         ).permitAll()

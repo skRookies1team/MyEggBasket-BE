@@ -14,24 +14,15 @@ import java.util.List;
 
 /**
  * 종목 구독 관리 컨트롤러
- * 
- * 사용자가 현재 조회 중인(구독 중인) 종목을 관리합니다.
- * - 기본 종목 외에 사용자가 추가로 조회 중인 종목
- * - 구독/해지 시 Kafka 이벤트 발행
  */
 @Tag(name = "Stock Subscription", description = "종목 구독 관리 API")
 @RestController
 @RequestMapping("/api/app/subscriptions")
 @RequiredArgsConstructor
 public class StockSubscriptionController {
-    
+
     private final StockSubscriptionService stockSubscriptionService;
 
-    /**
-     * 종목 구독 (조회 시작)
-     * 사용자가 특정 종목을 조회하기 시작할 때 호출합니다.
-     * StockCollector가 해당 종목의 실시간 데이터를 수집하기 시작합니다.
-     */
     @Operation(summary = "종목 구독", description = "사용자가 종목 조회를 시작합니다.")
     @PostMapping
     public ResponseEntity<StockSubscriptionDTO.SubscriptionResponse> subscribe(
@@ -40,10 +31,6 @@ public class StockSubscriptionController {
                 .body(stockSubscriptionService.subscribe(request));
     }
 
-    /**
-     * 종목 구독 해지 (조회 종료)
-     * 사용자가 특정 종목 조회를 종료할 때 호출합니다.
-     */
     @Operation(summary = "종목 구독 해지", description = "사용자가 종목 조회를 종료합니다.")
     @DeleteMapping("/{stockCode}")
     public ResponseEntity<Void> unsubscribe(@PathVariable String stockCode) {
@@ -51,23 +38,26 @@ public class StockSubscriptionController {
         return ResponseEntity.noContent().build();
     }
 
-    /**
-     * 내 구독 종목 목록 조회
-     * 현재 로그인한 사용자가 구독 중인 종목 목록을 조회합니다.
-     */
     @Operation(summary = "내 구독 종목 목록", description = "현재 구독 중인 종목 목록을 조회합니다.")
     @GetMapping
     public ResponseEntity<List<StockSubscriptionDTO.SubscriptionResponse>> getMySubscriptions() {
         return ResponseEntity.ok(stockSubscriptionService.getMySubscriptions());
     }
 
-    /**
-     * 특정 종목의 구독자 수 조회
-     * 관리자나 통계 목적으로 사용합니다.
-     */
     @Operation(summary = "종목 구독자 수", description = "특정 종목을 구독 중인 사용자 수를 조회합니다.")
     @GetMapping("/{stockCode}/count")
     public ResponseEntity<Long> getSubscriberCount(@PathVariable String stockCode) {
         return ResponseEntity.ok(stockSubscriptionService.getSubscriberCount(stockCode));
+    }
+
+    /**
+     * [추가] System/Collector용: 현재 활성화된 모든 구독 종목 코드 조회
+     * Python Collector가 서버 시작 시 이 목록을 받아 KIS WS 구독을 초기화합니다.
+     */
+    @Operation(summary = "[System] 활성 구독 종목 전체 조회", description = "현재 구독 중인 모든 종목 코드를 중복 없이 조회합니다.")
+    @GetMapping("/active-codes")
+    public ResponseEntity<List<String>> getAllActiveStockCodes() {
+        // Service에 getAllActiveStockCodes() 메소드가 필요합니다. (Repository의 Distinct Query 호출)
+        return ResponseEntity.ok(stockSubscriptionService.getAllActiveStockCodes());
     }
 }
