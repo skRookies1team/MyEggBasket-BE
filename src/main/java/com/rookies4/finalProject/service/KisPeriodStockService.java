@@ -28,7 +28,8 @@ public class KisPeriodStockService {
 
     @SuppressWarnings("unchecked")
     public KisPeriodStockDTO.ChartResponse getChartData(String stockCode, String period, Long userId) {
-        // [수정] minute 요청일 경우 별도 로직 처리
+
+        // 분봉(minute) 요청일 경우 전용 메서드 호출
         if ("minute".equalsIgnoreCase(period)) {
             return getMinuteChartData(stockCode, userId);
         }
@@ -54,15 +55,17 @@ public class KisPeriodStockService {
 
         List<Map<String, Object>> output2 = (List<Map<String, Object>>) body.get("output2");
 
-        return buildResponse(stockCode, period, output2, false); // isMinute = false
+        // 일봉 등은 isMinute = false
+        return buildResponse(stockCode, period, output2, false);
     }
 
     /**
-     * [추가] 분봉(Time) 차트 데이터 조회 (FHKST03010200)
+     * [수정] 분봉 데이터 조회 (FHKST03010200)
+     * 파라미터명 수정: FID_INPUT_HOUR -> FID_INPUT_HOUR_1
      */
     @SuppressWarnings("unchecked")
     private KisPeriodStockDTO.ChartResponse getMinuteChartData(String stockCode, Long userId) {
-        // 현재 시간 (HHmmss) - 장 마감 후면 153000 등으로 고정해도 되지만, KIS API는 미래 시간을 넣으면 현재까지의 데이터를 줌
+        // 현재 시간 (HHmmss)
         String currentTime = LocalTime.now().format(DateTimeFormatter.ofPattern("HHmmss"));
 
         KisApiRequest request = KisApiRequest.builder()
@@ -71,8 +74,8 @@ public class KisPeriodStockService {
                 .param("FID_ETC_CLS_CODE", "")
                 .param("FID_COND_MRKT_DIV_CODE", "J")
                 .param("FID_INPUT_ISCD", stockCode)
-                .param("FID_INPUT_HOUR", currentTime) // 현재 시간 기준 조회
-                .param("FID_PW_DATA_INCU_YN", "Y")    // 과거 데이터 포함
+                .param("FID_INPUT_HOUR_1", currentTime) // [수정됨] API 문서 기준 올바른 파라미터명
+                .param("FID_PW_DATA_INCU_YN", "Y")      // 과거 데이터 포함
                 .useVirtualServer(false)
                 .build();
 
@@ -81,7 +84,8 @@ public class KisPeriodStockService {
 
         List<Map<String, Object>> output2 = (List<Map<String, Object>>) body.get("output2");
 
-        return buildResponse(stockCode, "minute", output2, true); // isMinute = true
+        // 분봉은 isMinute = true
+        return buildResponse(stockCode, "minute", output2, true);
     }
 
     private void validateApiResponse(Map<String, Object> body) {
@@ -107,8 +111,7 @@ public class KisPeriodStockService {
                 .map(item -> isMinute ? transformToMinuteChartData(item) : transformToDailyChartData(item))
                 .collect(Collectors.toList());
 
-        // 분봉 데이터는 API가 최신순(내림차순)으로 줄 수 있으므로, 필요 시 시간순 정렬
-        // (프론트엔드인 lightweight-charts는 오름차순을 요구함)
+        // KIS 분봉 데이터는 최신순(내림차순)으로 옴 -> 시간순(오름차순) 정렬 필요시 reverse
         Collections.reverse(chartData);
 
         log.info("[KIS] 차트 데이터 조회 성공 - StockCode: {}, Period: {}, DataCount: {}", stockCode, period, chartData.size());
@@ -120,7 +123,7 @@ public class KisPeriodStockService {
                 .build();
     }
 
-    // [기존 로직] 일/주/월/년 데이터 변환
+    // 일봉 데이터 매핑
     private KisPeriodStockDTO.ChartData transformToDailyChartData(Map<String, Object> output) {
         return KisPeriodStockDTO.ChartData.builder()
                 .time(formatApiDate((String) output.get("stck_bsop_date")))
@@ -132,19 +135,16 @@ public class KisPeriodStockService {
                 .build();
     }
 
-    // [추가] 분봉 데이터 변환
+    // [수정됨] 분봉 데이터 매핑: 날짜 + 시간 포맷팅 적용
     private KisPeriodStockDTO.ChartData transformToMinuteChartData(Map<String, Object> output) {
-        // 분봉 API 필드명은 일봉과 다름
-        // stck_cntg_hour: 시간
-        // stck_prpr: 현재가(종가)
-        // stck_oprc: 시가
-        // stck_hgpr: 고가
-        // stck_lwpr: 저가
-        // cntg_vol: 체결거래량 (accumulated volume을 원하면 acml_vol 확인 필요, 보통 캔들은 해당 분의 거래량이므로 cntg_vol 사용)
-        // 하지만 KIS API 'inquire-time-itemchartprice' output2에서는 'cntg_vol'이 그 시간대의 거래량임.
+        String date = (String) output.get("stck_bsop_date"); // YYYYMMDD
+        String time = (String) output.get("stck_cntg_hour"); // HHmmss
+
+        // 프론트엔드 호환성을 위해 "YYYY-MM-DD HH:mm:ss" 형식으로 변환
+        String formattedTime = formatMinuteDateTime(date, time);
 
         return KisPeriodStockDTO.ChartData.builder()
-                .time((String) output.get("stck_cntg_hour")) // HHmmss 포맷 그대로 반환 (프론트에서 처리)
+                .time(formattedTime)
                 .price(parseLong(output.get("stck_prpr")))
                 .open(parseLong(output.get("stck_oprc")))
                 .high(parseLong(output.get("stck_hgpr")))
@@ -153,13 +153,22 @@ public class KisPeriodStockService {
                 .build();
     }
 
+    // [추가됨] 분봉 날짜/시간 포맷팅 헬퍼
+    private String formatMinuteDateTime(String date, String time) {
+        if (date == null || date.length() != 8 || time == null || time.length() != 6) {
+            return time; // 데이터가 이상할 경우 원본 반환 (혹은 에러처리)
+        }
+        // "20240521" + "123000" -> "2024-05-21 12:30:00"
+        return date.substring(0, 4) + "-" + date.substring(4, 6) + "-" + date.substring(6, 8) + " " +
+                time.substring(0, 2) + ":" + time.substring(2, 4) + ":" + time.substring(4, 6);
+    }
+
     private String getPeriodCode(String period) {
         switch (period.toLowerCase()) {
             case "day": return "D";
             case "week": return "W";
             case "month": return "M";
             case "year": return "Y";
-            // minute는 별도 메서드에서 처리하므로 여기서는 에러
             default: throw new BusinessException(ErrorCode.VALIDATION_ERROR, "유효하지 않은 기간입니다: " + period);
         }
     }
@@ -168,18 +177,11 @@ public class KisPeriodStockService {
         LocalDate now = LocalDate.now();
         LocalDate startDate;
         switch (period.toLowerCase()) {
-            case "day":
-                startDate = now.minusMonths(6);
-                break;
-            case "week":
-                startDate = now.minusYears(2);
-                break;
+            case "day": startDate = now.minusMonths(6); break;
+            case "week": startDate = now.minusYears(2); break;
             case "month":
-            case "year":
-                startDate = now.minusYears(5);
-                break;
-            default:
-                throw new BusinessException(ErrorCode.VALIDATION_ERROR, "유효하지 않은 기간입니다: " + period);
+            case "year": startDate = now.minusYears(5); break;
+            default: throw new BusinessException(ErrorCode.VALIDATION_ERROR, "유효하지 않은 기간입니다: " + period);
         }
         return startDate.format(DateTimeFormatter.ofPattern("yyyyMMdd"));
     }
