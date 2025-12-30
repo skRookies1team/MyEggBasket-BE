@@ -69,15 +69,15 @@ public class KafkaConfig {
      * StockTickDTO를 수신하기 위한 Consumer Factory
      */
     @Bean
-    public ConsumerFactory<String, StockTickDTO> stockTickConsumerFactory() {
+    public ConsumerFactory<String, Map<String, Object>> stockTickConsumerFactory() {
         Map<String, Object> config = new HashMap<>();
         config.put(ConsumerConfig.BOOTSTRAP_SERVERS_CONFIG, bootstrapServers);
         config.put(ConsumerConfig.GROUP_ID_CONFIG, defaultGroupId);
 
-        // Deserializer 설정 (JsonDeserializer 사용)
-        JsonDeserializer<StockTickDTO> deserializer = new JsonDeserializer<>(StockTickDTO.class);
+        // Value Deserializer를 Map.class로 설정
+        JsonDeserializer<Map<String, Object>> deserializer = new JsonDeserializer<>(Map.class);
         deserializer.setRemoveTypeHeaders(false);
-        deserializer.addTrustedPackages("*"); // 모든 패키지 신뢰 허용 (필요 시 구체적 패키지 명시)
+        deserializer.addTrustedPackages("*");
         deserializer.setUseTypeMapperForKey(true);
 
         return new DefaultKafkaConsumerFactory<>(
@@ -87,13 +87,10 @@ public class KafkaConfig {
         );
     }
 
-    /**
-     * @KafkaListener에서 사용할 ContainerFactory
-     * 이름: stockTickKafkaListenerContainerFactory
-     */
+    // [수정] ContainerFactory
     @Bean
-    public ConcurrentKafkaListenerContainerFactory<String, StockTickDTO> stockTickKafkaListenerContainerFactory() {
-        ConcurrentKafkaListenerContainerFactory<String, StockTickDTO> factory =
+    public ConcurrentKafkaListenerContainerFactory<String, Map<String, Object>> stockTickKafkaListenerContainerFactory() {
+        ConcurrentKafkaListenerContainerFactory<String, Map<String, Object>> factory =
                 new ConcurrentKafkaListenerContainerFactory<>();
         factory.setConsumerFactory(stockTickConsumerFactory());
         return factory;
