@@ -10,6 +10,7 @@ import com.rookies4.finalProject.repository.PriceTargetRepository;
 import com.rookies4.finalProject.repository.StockRepository;
 import com.rookies4.finalProject.repository.UserRepository;
 import com.rookies4.finalProject.security.SecurityUtil;
+import java.util.ArrayList;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -20,7 +21,7 @@ import java.time.LocalDateTime;
 import java.util.List;
 import java.util.stream.Collectors;
 
-// 목표가 설정/관리 서비스
+// 목표가 관리 서비스
 @Slf4j
 @Service
 @RequiredArgsConstructor
@@ -213,92 +214,70 @@ public class PriceTargetService {
     }
 
     // 실시간 체결가 수신 시 목표가 도달 여부 판단
-    public void evaluate(String stockCode, BigDecimal currentPrice) {
+    public List<PriceTarget> evaluate(String stockCode, BigDecimal currentPrice) {
         if (stockCode == null || currentPrice == null) {
-            return;
+            return List.of();
         }
 
         List<PriceTarget> targets =
                 priceTargetRepository.findByStockCodeAndEnabled(stockCode);
 
+        List<PriceTarget> reachedTargets = new ArrayList<>();
         LocalDateTime now = LocalDateTime.now();
 
         for (PriceTarget target : targets) {
-            checkUpperTarget(target, stockCode, currentPrice, now);
-            checkLowerTarget(target, stockCode, currentPrice, now);
+            if (checkUpperTarget(target, currentPrice, now)) {
+                reachedTargets.add(target);
+            }
+            if (checkLowerTarget(target, currentPrice, now)) {
+                reachedTargets.add(target);
+            }
         }
+
+        return reachedTargets;
     }
 
-    private void checkUpperTarget(
+    private boolean checkUpperTarget(
             PriceTarget target,
-            String stockCode,
             BigDecimal currentPrice,
             LocalDateTime now
     ) {
-        if (target.getUpperTarget() == null) {
-            return;
-        }
+        if (target.getUpperTarget() == null) return false;
+        if (currentPrice.compareTo(target.getUpperTarget()) < 0) return false;
 
-        if (currentPrice.compareTo(target.getUpperTarget()) < 0) {
-            return;
-        }
-
-        boolean inCooldown =
-                Boolean.TRUE.equals(target.getUpperTriggered())
-                        && target.getUpperTriggeredAt() != null
-                        && target.getUpperTriggeredAt()
-                        .plusMinutes(ALERT_COOLDOWN_MINUTES)
-                        .isAfter(now);
-        if (inCooldown) {
-            return;
+        if (Boolean.TRUE.equals(target.getUpperTriggered())
+                && target.getUpperTriggeredAt() != null
+                && target.getUpperTriggeredAt()
+                .plusMinutes(ALERT_COOLDOWN_MINUTES)
+                .isAfter(now)) {
+            return false;
         }
 
         target.setUpperTriggered(true);
         target.setUpperTriggeredAt(now);
         priceTargetRepository.save(target);
-
-        log.info(
-                "[UPPER ALERT] userId={}, stockCode={}, price={}",
-                target.getUser().getId(),
-                stockCode,
-                currentPrice
-        );
+        return true;
     }
 
-    private void checkLowerTarget(
+    private boolean checkLowerTarget(
             PriceTarget target,
-            String stockCode,
             BigDecimal currentPrice,
             LocalDateTime now
     ) {
-        if (target.getLowerTarget() == null) {
-            return;
-        }
+        if (target.getLowerTarget() == null) return false;
+        if (currentPrice.compareTo(target.getLowerTarget()) > 0) return false;
 
-        if (currentPrice.compareTo(target.getLowerTarget()) > 0) {
-            return;
-        }
-
-        boolean inCooldown =
-                Boolean.TRUE.equals(target.getLowerTriggered())
-                        && target.getLowerTriggeredAt() != null
-                        && target.getLowerTriggeredAt()
-                        .plusMinutes(ALERT_COOLDOWN_MINUTES)
-                        .isAfter(now);
-
-        if (inCooldown) {
-            return;
+        if (Boolean.TRUE.equals(target.getLowerTriggered())
+                && target.getLowerTriggeredAt() != null
+                && target.getLowerTriggeredAt()
+                .plusMinutes(ALERT_COOLDOWN_MINUTES)
+                .isAfter(now)) {
+            return false;
         }
 
         target.setLowerTriggered(true);
         target.setLowerTriggeredAt(now);
         priceTargetRepository.save(target);
-
-        log.info(
-                "[LOWER ALERT] userId={}, stockCode={}, price={}",
-                target.getUser().getId(),
-                stockCode,
-                currentPrice
-        );
+        return true;
     }
 }
