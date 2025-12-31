@@ -28,6 +28,10 @@ public class Transaction {
     private User user;
 
     @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "portfolio_id")
+    private Portfolio portfolio;
+
+    @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "stock_code")
     private Stock stock;
 
@@ -85,6 +89,7 @@ public class Transaction {
         return "Transaction{" +
                 "transactionId=" + transactionId +
                 ", userId=" + (user != null ? user.getId() : null) +
+                ", portfolioId=" + (portfolio != null ? portfolio.getPortfolioId() : null) +
                 ", stockCode=" + (stock != null ? stock.getStockCode() : null) +
                 ", type='" + type + '\'' +
                 ", quantity=" + quantity +

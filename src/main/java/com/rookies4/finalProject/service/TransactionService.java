@@ -1,19 +1,26 @@
 package com.rookies4.finalProject.service;
 
+import com.rookies4.finalProject.domain.entity.Portfolio;
+import com.rookies4.finalProject.domain.entity.Stock;
 import com.rookies4.finalProject.domain.entity.Transaction;
 import com.rookies4.finalProject.domain.entity.User;
 import com.rookies4.finalProject.domain.enums.TransactionStatus;
+import com.rookies4.finalProject.domain.enums.TransactionType;
+import com.rookies4.finalProject.domain.enums.TriggerSource;
 import com.rookies4.finalProject.dto.TransactionDTO;
 import com.rookies4.finalProject.exception.BusinessException;
 import com.rookies4.finalProject.exception.ErrorCode;
+import com.rookies4.finalProject.repository.PortfolioRepository;
+import com.rookies4.finalProject.repository.StockRepository;
 import com.rookies4.finalProject.repository.TransactionRepository;
 import com.rookies4.finalProject.repository.UserRepository;
-import com.rookies4.finalProject.security.SecurityUtil;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
+import java.math.BigDecimal;
+import java.time.LocalDateTime;
 import java.util.List;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -25,6 +32,8 @@ public class TransactionService {
     private final TransactionRepository transactionRepository;
     private final UserRepository userRepository;
     private final TransactionSyncService transactionSyncService;
+    private final PortfolioRepository portfolioRepository;
+    private final StockRepository stockRepository;
 
     /**
      * 사용자 주문/거래 내역 조회
@@ -34,11 +43,29 @@ public class TransactionService {
     @Transactional(readOnly = true)
     public List<TransactionDTO.Response> getUserOrders(Long userId, String status, boolean useVirtualServer) {
 
+        return getUserOrders(userId, status, useVirtualServer, null);
+    }
+
+    @Transactional(readOnly = true)
+    public List<TransactionDTO.Response> getUserOrders(Long userId, String status, boolean useVirtualServer, Long portfolioId) {
+
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new BusinessException(
                         ErrorCode.USER_NOT_FOUND,
                         "해당 ID의 사용자를 찾을 수 없습니다.")
                 );
+
+        Portfolio portfolio = null;
+        if (portfolioId != null) {
+            portfolio = portfolioRepository.findById(portfolioId)
+                    .orElseThrow(() -> new BusinessException(ErrorCode.PORTFOLIO_NOT_FOUND));
+
+            if (!portfolio.getUser().getId().equals(userId)) {
+                throw new BusinessException(
+                        ErrorCode.AUTH_ACCESS_DENIED,
+                        "해당 포트폴리오에 대한 접근 권한이 없습니다.");
+            }
+        }
 
         // 2. KIS API 동기화 (주문 내역 조회 시마다 갱신)
         try {
@@ -55,7 +82,13 @@ public class TransactionService {
         }
 
         List<Transaction> transactions;
-        if (statusFilter != null) {
+        if (portfolio != null && statusFilter != null) {
+            transactions = transactionRepository
+                    .findByUser_IdAndPortfolio_PortfolioIdAndStatusOrderByExecutedAtDesc(userId, portfolioId, statusFilter);
+        } else if (portfolio != null) {
+            transactions = transactionRepository
+                    .findByUser_IdAndPortfolio_PortfolioIdOrderByExecutedAtDesc(userId, portfolioId);
+        } else if (statusFilter != null) {
             transactions = transactionRepository
                     .findByUser_IdAndStatusOrderByExecutedAtDesc(userId, statusFilter);
         } else {
@@ -90,5 +123,85 @@ public class TransactionService {
                     "유효하지 않은 주문 상태값입니다: " + raw
             );
         }
+    }
+
+    /**
+     * KIS 주문 요청 직후 DB에 거래 초안(PENDING)을 기록해 orderNo-portfolio 매핑을 남긴다.
+     * 이후 동기화 시 동일 orderNo 로 upsert 되며 포트폴리오 정보가 유지된다.
+     */
+    @Transactional
+    public void recordLocalOrder(
+            User user,
+            TransactionType orderType,
+            TriggerSource triggerSource,
+            String stockCode,
+            Integer quantity,
+            Integer price,
+            Long portfolioId,
+            String orderNo
+    ) {
+        if (user == null) {
+            throw new BusinessException(ErrorCode.USER_NOT_FOUND, "사용자 정보가 없습니다.");
+        }
+        if (orderNo == null || orderNo.isBlank()) {
+            log.warn("[Transaction] orderNo 누락으로 거래 기록을 건너뜁니다. userId={}, stockCode={}", user.getId(), stockCode);
+            return;
+        }
+
+        Portfolio portfolio = null;
+        if (portfolioId != null) {
+            portfolio = portfolioRepository.findById(portfolioId)
+                    .orElseThrow(() -> new BusinessException(ErrorCode.PORTFOLIO_NOT_FOUND));
+
+            if (!portfolio.getUser().getId().equals(user.getId())) {
+                throw new BusinessException(
+                        ErrorCode.AUTH_ACCESS_DENIED,
+                        "해당 포트폴리오에 대한 접근 권한이 없습니다.");
+            }
+        }
+
+        Stock stock = null;
+        if (stockCode != null && !stockCode.isBlank()) {
+            stock = stockRepository.findById(stockCode)
+                    .orElseGet(() -> stockRepository.save(Stock.builder()
+                            .stockCode(stockCode)
+                            .name("")
+                            .build()));
+        }
+
+        Transaction transaction = transactionRepository.findByUser_IdAndOrderNo(user.getId(), orderNo)
+                .orElseGet(() -> Transaction.builder()
+                        .user(user)
+                        .orderNo(orderNo)
+                        .build());
+
+        if (portfolio != null) {
+            transaction.setPortfolio(portfolio);
+        }
+        if (stock != null) {
+            transaction.setStock(stock);
+        }
+        if (orderType != null) {
+            transaction.setType(orderType);
+        }
+        if (quantity != null) {
+            transaction.setQuantity(quantity);
+        }
+        if (transaction.getFilledQuantity() == null) {
+            transaction.setFilledQuantity(0);
+        }
+        if (price != null) {
+            transaction.setPrice(BigDecimal.valueOf(price));
+        }
+        if (triggerSource != null) {
+            transaction.setTriggerSource(triggerSource);
+        }
+        transaction.setStatus(TransactionStatus.PENDING);
+        if (transaction.getExecutedAt() == null) {
+            transaction.setExecutedAt(LocalDateTime.now());
+        }
+
+        transactionRepository.save(transaction);
+        log.info("[Transaction] 주문 기록 저장 완료 userId={}, orderNo={}, portfolioId={}", user.getId(), orderNo, portfolioId);
     }
 }

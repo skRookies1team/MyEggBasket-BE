@@ -7,6 +7,7 @@ import com.rookies4.finalProject.repository.UserRepository;
 import com.rookies4.finalProject.service.AIRecommendationService; // [추가]
 import com.rookies4.finalProject.service.KisBalanceService;
 import com.rookies4.finalProject.service.KisStockOrderService;
+import com.rookies4.finalProject.service.TransactionService;
 import lombok.Data; // [추가]
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -26,6 +27,7 @@ public class InternalAiController {
     private final UserRepository userRepository;
     private final KisBalanceService kisBalanceService;
     private final KisStockOrderService kisStockOrderService;
+    private final TransactionService transactionService;
     private final AIRecommendationService aiRecommendationService; // [추가] 서비스 주입
 
     @Value("${ai.secret-key:my-secret-ai-key}")
@@ -67,7 +69,24 @@ public class InternalAiController {
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new RuntimeException("User not found"));
 
-        return ResponseEntity.ok(kisStockOrderService.orderStock(true, user, requestDto));
+        KisStockOrderDTO.OrderResponse response = kisStockOrderService.orderStock(true, user, requestDto);
+
+        String orderNo = response != null && response.getOutput() != null
+            ? response.getOutput().getOrderNo()
+            : null;
+
+        transactionService.recordLocalOrder(
+            user,
+            requestDto.getOrderType(),
+            requestDto.getTriggerSource(),
+            requestDto.getStockCode(),
+            requestDto.getQuantity(),
+            requestDto.getPrice(),
+            requestDto.getPortfolioId(),
+            orderNo
+        );
+
+        return ResponseEntity.ok(response);
     }
 
     // [추가] AI 조언 수신 엔드포인트

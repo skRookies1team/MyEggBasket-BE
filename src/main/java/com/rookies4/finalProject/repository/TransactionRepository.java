@@ -16,6 +16,12 @@ public interface TransactionRepository extends JpaRepository<Transaction, Long> 
     // 2. 사용자 ID로 전체 조회
     List<Transaction> findByUser_IdOrderByExecutedAtDesc(Long userId);
 
+    // 2-1. 사용자 ID + 포트폴리오로 조회
+    List<Transaction> findByUser_IdAndPortfolio_PortfolioIdOrderByExecutedAtDesc(Long userId, Long portfolioId);
+
+    // 2-2. 사용자 ID + 포트폴리오 + 상태로 조회
+    List<Transaction> findByUser_IdAndPortfolio_PortfolioIdAndStatusOrderByExecutedAtDesc(Long userId, Long portfolioId, TransactionStatus status);
+
     // 3. 사용자 ID와 KIS 주문번호(orderNo)로 거래 내역 찾기
     Optional<Transaction> findByUser_IdAndOrderNo(Long userId, String orderNo);
 }

@@ -60,6 +60,7 @@ public class KisStockOrderDTO {
         private Integer quantity;              // 주문수량
         private Integer price;                 // 주문단가
         private TriggerSource triggerSource;   // MANUAL / AI
+        private Long portfolioId;              // 주문 대상 포트폴리오
     }
 
     @Data
@@ -72,5 +73,6 @@ public class KisStockOrderDTO {
         private Integer quantity;              // 주문수량
         private Integer limitPrice;            // 지정가(주문단가)
         private TriggerSource triggerSource;   // MANUAL / AI
+        private Long portfolioId;              // 주문 대상 포트폴리오
     }
 }

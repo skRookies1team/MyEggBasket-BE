@@ -47,7 +47,25 @@ public class TradeController {
                         "로그인한 사용자를 찾을 수 없습니다."));
 
 
-        return ResponseEntity.ok(kisStockOrderService.orderStock(useVirtualServer, user, orderRequest));
+        KisStockOrderDTO.OrderResponse response =
+            kisStockOrderService.orderStock(useVirtualServer, user, orderRequest);
+
+        String orderNo = response != null && response.getOutput() != null
+            ? response.getOutput().getOrderNo()
+            : null;
+
+        transactionService.recordLocalOrder(
+            user,
+            orderRequest.getOrderType(),
+            orderRequest.getTriggerSource(),
+            orderRequest.getStockCode(),
+            orderRequest.getQuantity(),
+            orderRequest.getPrice(),
+            orderRequest.getPortfolioId(),
+            orderNo
+        );
+
+        return ResponseEntity.ok(response);
     }
 
     // 1-1. 지정가 매수/매도 주문
@@ -68,14 +86,33 @@ public class TradeController {
                 .orElseThrow(() -> new BusinessException(ErrorCode.USER_NOT_FOUND,
                         "로그인한 사용자를 찾을 수 없습니다."));
 
-        return ResponseEntity.ok(kisStockOrderService.orderStockWithLimitPrice(useVirtualServer, user, orderRequest));
+        KisStockOrderDTO.OrderResponse response =
+            kisStockOrderService.orderStockWithLimitPrice(useVirtualServer, user, orderRequest);
+
+        String orderNo = response != null && response.getOutput() != null
+            ? response.getOutput().getOrderNo()
+            : null;
+
+        transactionService.recordLocalOrder(
+            user,
+            orderRequest.getOrderType(),
+            orderRequest.getTriggerSource(),
+            orderRequest.getStockCode(),
+            orderRequest.getQuantity(),
+            orderRequest.getLimitPrice(),
+            orderRequest.getPortfolioId(),
+            orderNo
+        );
+
+        return ResponseEntity.ok(response);
     }
 
     // 2. 거래/주문 내역 조회 (로그인 유저 기준)
     @GetMapping("/history")
     public ResponseEntity<List<TransactionDTO.Response>> getTradeHistory(
             @RequestParam(name = "virtual", defaultValue = "false") boolean useVirtualServer,
-            @RequestParam(required = false) String status) { // status 는 필수 아님 (nullable)
+            @RequestParam(required = false) String status,
+            @RequestParam(required = false) Long portfolioId) { // status 는 필수 아님 (nullable)
 
         Long currentUserId = SecurityUtil.getCurrentUserId();
         if (currentUserId == null) {
@@ -83,7 +120,7 @@ public class TradeController {
         }
 
         List<TransactionDTO.Response> result =
-                transactionService.getUserOrders(currentUserId, status, useVirtualServer);
+            transactionService.getUserOrders(currentUserId, status, useVirtualServer, portfolioId);
         return ResponseEntity.ok(result);
     }
 

@@ -20,6 +20,9 @@ public class TransactionDTO {
     public static class Response {
         private Long transactionId;
 
+        private Long portfolioId; // 포트폴리오 식별자
+        private String portfolioName; // 포트폴리오 이름
+
         // Stock 정보 매핑
         private String stockCode; // 종목코드
         private String stockName; // 종목명
@@ -44,6 +47,8 @@ public class TransactionDTO {
         public static Response fromEntity(Transaction transaction) {
             return Response.builder()
                     .transactionId(transaction.getTransactionId())
+                    .portfolioId(transaction.getPortfolio() != null ? transaction.getPortfolio().getPortfolioId() : null)
+                    .portfolioName(transaction.getPortfolio() != null ? transaction.getPortfolio().getName() : null)
                     .stockCode(transaction.getStock() != null ? transaction.getStock().getStockCode() : null)
                     .stockName(transaction.getStock() != null ? transaction.getStock().getName() : null)
 
