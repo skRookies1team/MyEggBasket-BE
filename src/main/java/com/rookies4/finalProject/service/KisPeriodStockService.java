@@ -13,6 +13,7 @@ import org.springframework.transaction.annotation.Transactional;
 import java.time.LocalDate;
 import java.time.LocalTime;
 import java.time.format.DateTimeFormatter;
+import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
@@ -35,33 +36,78 @@ public class KisPeriodStockService {
         }
 
         String periodCode = getPeriodCode(period);
-        String startDate = getStartDate(period);
-        String endDate = LocalDate.now().format(DateTimeFormatter.ofPattern("yyyyMMdd"));
+        // 목표 시작 날짜 (예: 5년 전)
+        String targetStartDateStr = getStartDate(period);
+        // 조회 끝 날짜 (초기값: 오늘)
+        String currentEndDateStr = LocalDate.now().format(DateTimeFormatter.ofPattern("yyyyMMdd"));
 
-        KisApiRequest request = KisApiRequest.builder()
-                .path("/uapi/domestic-stock/v1/quotations/inquire-daily-itemchartprice")
-                .trId("FHKST03010100")
-                .param("FID_COND_MRKT_DIV_CODE", "J")
-                .param("FID_INPUT_ISCD", stockCode)
-                .param("FID_INPUT_DATE_1", startDate)
-                .param("FID_INPUT_DATE_2", endDate)
-                .param("FID_PERIOD_DIV_CODE", periodCode)
-                .param("FID_ORG_ADJ_PRC", "1")
-                .useVirtualServer(false)
-                .build();
+        List<Map<String, Object>> allData = new ArrayList<>();
 
-        Map<String, Object> body = kisApiClient.get(userId, request, Map.class);
-        validateApiResponse(body);
+        // 반복 조회 로직 (Pagination)
+        // KIS API는 한 번에 100건만 주므로, 과거 데이터가 더 있으면 end date를 옮겨서 다시 요청
+        int maxCalls = 20; // 무한 루프 방지용 (최대 20번 호출 -> 약 2000일, 4~5년치 데이터)
+        int callCount = 0;
 
-        List<Map<String, Object>> output2 = (List<Map<String, Object>>) body.get("output2");
+        while (callCount < maxCalls) {
+            try {
+                // API 연속 호출 시 차단 방지를 위한 짧은 대기 (선택 사항)
+                if (callCount > 0) Thread.sleep(50);
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+                break;
+            }
 
-        // 일봉 등은 isMinute = false
-        return buildResponse(stockCode, period, output2, false);
+            KisApiRequest request = KisApiRequest.builder()
+                    .path("/uapi/domestic-stock/v1/quotations/inquire-daily-itemchartprice")
+                    .trId("FHKST03010100")
+                    .param("FID_COND_MRKT_DIV_CODE", "J")
+                    .param("FID_INPUT_ISCD", stockCode)
+                    .param("FID_INPUT_DATE_1", targetStartDateStr) // 목표 시작일은 고정
+                    .param("FID_INPUT_DATE_2", currentEndDateStr)  // 검색 끝나는 날짜는 계속 과거로 이동
+                    .param("FID_PERIOD_DIV_CODE", periodCode)
+                    .param("FID_ORG_ADJ_PRC", "1")
+                    .useVirtualServer(false)
+                    .build();
+
+            Map<String, Object> body = kisApiClient.get(userId, request, Map.class);
+            validateApiResponse(body);
+
+            List<Map<String, Object>> batch = (List<Map<String, Object>>) body.get("output2");
+
+            if (batch == null || batch.isEmpty()) {
+                break; // 더 이상 데이터가 없으면 종료
+            }
+
+            // 조회된 데이터를 전체 리스트에 추가
+            allData.addAll(batch);
+
+            // 받은 데이터가 100건 미만이면 더 이상 과거 데이터가 없다는 뜻 -> 종료
+            if (batch.size() < 100) {
+                break;
+            }
+
+            // 이번 배치에서 가장 오래된 날짜 확인 (KIS 데이터는 내림차순이므로 마지막 인덱스)
+            String oldestDateInBatch = (String) batch.get(batch.size() - 1).get("stck_bsop_date");
+
+            // 목표 시작일보다 더 과거이거나 같으면 충분히 조회한 것 -> 종료
+            if (oldestDateInBatch.compareTo(targetStartDateStr) <= 0) {
+                break;
+            }
+
+            // [다음 반복 준비]
+            // 가장 오래된 날짜의 '하루 전'을 새로운 종료일(FID_INPUT_DATE_2)로 설정
+            LocalDate oldestDate = LocalDate.parse(oldestDateInBatch, DateTimeFormatter.ofPattern("yyyyMMdd"));
+            currentEndDateStr = oldestDate.minusDays(1).format(DateTimeFormatter.ofPattern("yyyyMMdd"));
+
+            callCount++;
+        }
+
+        // 수집된 모든 데이터를 변환하여 반환
+        return buildResponse(stockCode, period, allData, false);
     }
 
     /**
-     * [수정] 분봉 데이터 조회 (FHKST03010200)
-     * 파라미터명 수정: FID_INPUT_HOUR -> FID_INPUT_HOUR_1
+     * 분봉 데이터 조회 (FHKST03010200)
      */
     @SuppressWarnings("unchecked")
     private KisPeriodStockDTO.ChartResponse getMinuteChartData(String stockCode, Long userId) {
@@ -74,7 +120,7 @@ public class KisPeriodStockService {
                 .param("FID_ETC_CLS_CODE", "")
                 .param("FID_COND_MRKT_DIV_CODE", "J")
                 .param("FID_INPUT_ISCD", stockCode)
-                .param("FID_INPUT_HOUR_1", currentTime) // [수정됨] API 문서 기준 올바른 파라미터명
+                .param("FID_INPUT_HOUR_1", currentTime)
                 .param("FID_PW_DATA_INCU_YN", "Y")      // 과거 데이터 포함
                 .useVirtualServer(false)
                 .build();
@@ -111,7 +157,8 @@ public class KisPeriodStockService {
                 .map(item -> isMinute ? transformToMinuteChartData(item) : transformToDailyChartData(item))
                 .collect(Collectors.toList());
 
-        // KIS 분봉 데이터는 최신순(내림차순)으로 옴 -> 시간순(오름차순) 정렬 필요시 reverse
+        // KIS 데이터는 최신순(내림차순)으로 옴. 반복 조회로 쌓인 데이터도 [최신..과거], [더과거..더더과거] 순임.
+        // 차트 라이브러리는 보통 시간 오름차순(과거->미래)을 원하므로 전체를 뒤집어줌.
         Collections.reverse(chartData);
 
         log.info("[KIS] 차트 데이터 조회 성공 - StockCode: {}, Period: {}, DataCount: {}", stockCode, period, chartData.size());
@@ -135,12 +182,11 @@ public class KisPeriodStockService {
                 .build();
     }
 
-    // [수정됨] 분봉 데이터 매핑: 날짜 + 시간 포맷팅 적용
+    // 분봉 데이터 매핑
     private KisPeriodStockDTO.ChartData transformToMinuteChartData(Map<String, Object> output) {
         String date = (String) output.get("stck_bsop_date"); // YYYYMMDD
         String time = (String) output.get("stck_cntg_hour"); // HHmmss
 
-        // 프론트엔드 호환성을 위해 "YYYY-MM-DD HH:mm:ss" 형식으로 변환
         String formattedTime = formatMinuteDateTime(date, time);
 
         return KisPeriodStockDTO.ChartData.builder()
@@ -153,10 +199,9 @@ public class KisPeriodStockService {
                 .build();
     }
 
-    // [추가됨] 분봉 날짜/시간 포맷팅 헬퍼
     private String formatMinuteDateTime(String date, String time) {
         if (date == null || date.length() != 8 || time == null || time.length() != 6) {
-            return time; // 데이터가 이상할 경우 원본 반환 (혹은 에러처리)
+            return time;
         }
         // "20240521" + "123000" -> "2024-05-21 12:30:00"
         return date.substring(0, 4) + "-" + date.substring(4, 6) + "-" + date.substring(6, 8) + " " +
@@ -177,11 +222,18 @@ public class KisPeriodStockService {
         LocalDate now = LocalDate.now();
         LocalDate startDate;
         switch (period.toLowerCase()) {
-            case "day": startDate = now.minusMonths(6); break;
-            case "week": startDate = now.minusYears(2); break;
+            case "day":
+                startDate = now.minusYears(5); // 일봉 5년
+                break;
+            case "week":
+                startDate = now.minusYears(10); // 주봉 10년
+                break;
             case "month":
-            case "year": startDate = now.minusYears(5); break;
-            default: throw new BusinessException(ErrorCode.VALIDATION_ERROR, "유효하지 않은 기간입니다: " + period);
+            case "year":
+                startDate = now.minusYears(20); // 월/년 20년
+                break;
+            default:
+                throw new BusinessException(ErrorCode.VALIDATION_ERROR, "유효하지 않은 기간입니다: " + period);
         }
         return startDate.format(DateTimeFormatter.ofPattern("yyyyMMdd"));
     }

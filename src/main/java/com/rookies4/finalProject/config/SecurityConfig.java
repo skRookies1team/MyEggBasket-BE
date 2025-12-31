@@ -64,6 +64,7 @@ public class SecurityConfig {
                                 "/api/app/auth/signup",
                                 "/api/app/auth/login",
                                 "/api/users",
+                                "/api/internal/**",
                                 "/api/auth/**",
                                 "/api/app/stocks/**",
                                 "/api/app/kis/stock/**",
