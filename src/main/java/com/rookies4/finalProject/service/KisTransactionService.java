@@ -25,6 +25,7 @@ public class KisTransactionService {
     private final SecureLogger secureLogger;
 
     public KisTransactionDTO getDailyOrderHistory(User user, String accessToken, boolean useVirtual) {
+        String threeMonthday = LocalDate.now().minusMonths(3).format(DateTimeFormatter.BASIC_ISO_DATE);
         String today = LocalDate.now().format(DateTimeFormatter.BASIC_ISO_DATE);
         String cano = user.getAccount();
         String trId = useVirtual ? "VTTC0081R" : "TTTC0081R";
@@ -34,7 +35,7 @@ public class KisTransactionService {
                 .trId(trId)
                 .param("CANO", cano)
                 .param("ACNT_PRDT_CD", ACCOUNT_PRODUCT_CODE)
-                .param("INQR_STRT_DT", today)
+                .param("INQR_STRT_DT", threeMonthday)
                 .param("INQR_END_DT", today)
                 .param("SLL_BUY_DVSN_CD", "00")
                 .param("PDNO", "")
