@@ -30,17 +30,24 @@ public class StockTickConsumer {
             groupId = "be-stock-ticks",
             containerFactory = "stockTickKafkaListenerContainerFactory"
     )
-    public void consumeStockData(Map<String, Object> data) {
-        String type = asString(data.get("type"));
-        if (type == null) {
-            log.debug("[Kafka] type missing: {}", data);
-            return;
-        }
+    public void consumeStockData(String message) {
+        try {
+            Map<String, Object> data =
+                    objectMapper.readValue(message, Map.class);
 
-        switch (type) {
-            case "STOCK_TICK" -> handleStockTick(data); // 실시간 체결가
-            case "ORDER_BOOK" -> handleOrderBook(data); // 실시간 호가
-            default -> log.debug("[Kafka] ignored type={}", type);
+            String type = asString(data.get("type"));
+            if (type == null) {
+                log.debug("[Kafka] type missing: {}", data);
+                return;
+            }
+
+            switch (type) {
+                case "STOCK_TICK" -> handleStockTick(data); // 실시간 체결가
+                case "ORDER_BOOK" -> handleOrderBook(data); // 실시간 호가
+                default -> log.debug("[Kafka] ignored type={}", type);
+            }
+        } catch (Exception e) {
+            log.error("[Kafka] 메시지 파싱 실패: {}", message, e);
         }
     }
 
