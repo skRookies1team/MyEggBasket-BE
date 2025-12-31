@@ -13,6 +13,7 @@ import lombok.Builder;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Data;
+import io.swagger.v3.oas.annotations.media.Schema;
 
 import java.time.LocalDate;
 import java.util.ArrayList;
@@ -59,7 +60,14 @@ public class AIBubbleChartDTO {
 
     @Getter
     @NoArgsConstructor
+    @Schema(
+            name = "AIBubbleChartTrendUpsertRequest",
+            description = "기간 키(예: 1_month, 3_months, 6_months, 1_year)를 루트에 두는 맵 구조",
+            example = "{\n  \"1_month\": {\n    \"period_start\": \"yyyy-MM-dd\",\n    \"period_end\": \"yyyy-MM-dd\",\n    \"keywords\": [ { \"name\": \"string\", \"count\": 0 } ],\n    \"categories\": [ { \"name\": \"string\", \"count\": 0 } ]\n  },\n  \"3_months\": {\n    \"period_start\": \"yyyy-MM-dd\",\n    \"period_end\": \"yyyy-MM-dd\",\n    \"keywords\": [ { \"name\": \"string\", \"count\": 0 } ],\n    \"categories\": [ { \"name\": \"string\", \"count\": 0 } ]\n  },\n  \"1_year\": {\n    \"period_start\": \"yyyy-MM-dd\",\n    \"period_end\": \"yyyy-MM-dd\",\n    \"keywords\": [ { \"name\": \"string\", \"count\": 0 } ],\n    \"categories\": [ { \"name\": \"string\", \"count\": 0 } ]\n  }\n}"
+    )
     public static class TrendUpsertRequest {
+
+        @Schema(hidden = true) 
         private Map<String, PeriodSummary> periods = new LinkedHashMap<>();
 
         @JsonCreator(mode = JsonCreator.Mode.DELEGATING)
