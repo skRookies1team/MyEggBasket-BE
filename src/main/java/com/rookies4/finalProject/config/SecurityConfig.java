@@ -66,6 +66,7 @@ public class SecurityConfig {
                                 "/api/users",
                                 "/api/internal/**",
                                 "/api/auth/**",
+                                "/api/app/ai/keywords/**",
                                 "/api/app/stocks/**",
                                 "/api/app/kis/stock/**",
                                 "/api/app/kis/trade/**",
@@ -86,9 +87,10 @@ public class SecurityConfig {
     }
     @Bean
     public CorsConfigurationSource corsConfigurationSource() {
-        CorsConfiguration configuration = new CorsConfiguration();
-        configuration.setAllowedOriginPatterns(List.of("https://dnz1jynzd0gb3.cloudfront.net"));
-        configuration.setAllowedOriginPatterns(List.of("http://localhost:5173"));
+        CorsConfiguration configuration = new CorsConfiguration();configuration.setAllowedOriginPatterns(List.of(
+                "https://dnz1jynzd0gb3.cloudfront.net",
+                "http://localhost:5173"
+        ));
         configuration.setAllowedMethods(Arrays.asList("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"));
         configuration.setAllowedHeaders(List.of("*"));
         configuration.setAllowCredentials(true);
