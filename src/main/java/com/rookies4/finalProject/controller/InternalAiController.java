@@ -1,11 +1,13 @@
 package com.rookies4.finalProject.controller;
 
 import com.rookies4.finalProject.dto.KisBalanceDTO;
-import com.rookies4.finalProject.dto.KisStockOrderDTO; // DTO 전체 import
+import com.rookies4.finalProject.dto.KisStockOrderDTO;
 import com.rookies4.finalProject.domain.entity.User;
 import com.rookies4.finalProject.repository.UserRepository;
+import com.rookies4.finalProject.service.AIRecommendationService; // [추가]
 import com.rookies4.finalProject.service.KisBalanceService;
 import com.rookies4.finalProject.service.KisStockOrderService;
+import lombok.Data; // [추가]
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
@@ -24,6 +26,7 @@ public class InternalAiController {
     private final UserRepository userRepository;
     private final KisBalanceService kisBalanceService;
     private final KisStockOrderService kisStockOrderService;
+    private final AIRecommendationService aiRecommendationService; // [추가] 서비스 주입
 
     @Value("${ai.secret-key:my-secret-ai-key}")
     private String aiSecretKey;
@@ -51,7 +54,6 @@ public class InternalAiController {
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new RuntimeException("User not found"));
 
-        // accessToken은 null, useVirtual은 true로 설정 (상황에 따라 false 변경)
         return ResponseEntity.ok(kisBalanceService.getBalanceFromKis(user, null, true));
     }
 
@@ -59,15 +61,42 @@ public class InternalAiController {
     public ResponseEntity<?> orderForUser(
             @RequestHeader("X-AI-SECRET") String secret,
             @PathVariable Long userId,
-            // [수정 1] RequestBody 타입을 Inner Class로 명시적으로 지정
             @RequestBody KisStockOrderDTO.KisStockOrderRequest requestDto) {
 
         validateSecret(secret);
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new RuntimeException("User not found"));
 
-        // [수정 2] 서비스 호출 결과를 ResponseEntity.ok()로 감싸기
-        // requestDto를 바로 전달 (이미 타입이 일치함)
         return ResponseEntity.ok(kisStockOrderService.orderStock(true, user, requestDto));
+    }
+
+    // [추가] AI 조언 수신 엔드포인트
+    @PostMapping("/ai/recommendation")
+    public ResponseEntity<?> receiveRecommendation(
+            @RequestHeader("X-AI-SECRET") String secret,
+            @RequestBody InternalRecommendationRequest request) {
+
+        validateSecret(secret);
+
+        // 서비스 호출하여 저장
+        aiRecommendationService.saveRecommendationForUser(
+                request.getUserId(),
+                request.getStockCode(),
+                request.getType(),
+                request.getReason(),
+                request.getScore()
+        );
+
+        return ResponseEntity.ok().body("Recommendation saved successfully");
+    }
+
+    // [추가] Python Payload 매핑용 DTO
+    @Data
+    public static class InternalRecommendationRequest {
+        private Long userId;
+        private String stockCode;
+        private String type; // "BUY", "SELL", "HOLD"
+        private String reason;
+        private Float score;
     }
 }

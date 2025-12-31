@@ -3,23 +3,29 @@ package com.rookies4.finalProject.service;
 import com.rookies4.finalProject.domain.entity.AIRecommendation;
 import com.rookies4.finalProject.domain.entity.Portfolio;
 import com.rookies4.finalProject.domain.entity.Stock;
+import com.rookies4.finalProject.domain.entity.User; // [추가]
+import com.rookies4.finalProject.domain.enums.RecommendationAction;
 import com.rookies4.finalProject.dto.AIRecommendationDTO;
 import com.rookies4.finalProject.exception.BusinessException;
 import com.rookies4.finalProject.exception.ErrorCode;
 import com.rookies4.finalProject.repository.AIRecommendationRepository;
 import com.rookies4.finalProject.repository.PortfolioRepository;
 import com.rookies4.finalProject.repository.StockRepository;
+import com.rookies4.finalProject.repository.UserRepository; // [추가]
 import com.rookies4.finalProject.security.SecurityUtil;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j; // [추가]
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.math.BigDecimal; // [추가]
 import java.util.List;
 import java.util.stream.Collectors;
 
+@Slf4j // [추가]
 @Service
 @RequiredArgsConstructor
 @Transactional
@@ -28,7 +34,9 @@ public class AIRecommendationService {
     private final AIRecommendationRepository aiRecommendationRepository;
     private final PortfolioRepository portfolioRepository;
     private final StockRepository stockRepository;
+    private final UserRepository userRepository; // [추가] 사용자 조회를 위해 주입
 
+    // 기존 메서드 (웹 프론트엔드용)
     public AIRecommendationDTO.RecommendationResponse createRecommendation(AIRecommendationDTO.RecommendationCreateRequest request) {
         Long currentUserId = requireCurrentUser();
 
@@ -53,6 +61,60 @@ public class AIRecommendationService {
                 .build();
 
         return AIRecommendationDTO.RecommendationResponse.fromEntity(aiRecommendationRepository.save(recommendation));
+    }
+
+    // [추가] 내부 AI 시스템용 (Python 봇 연동)
+    public void saveRecommendationForUser(Long userId, String stockCode, String actionStr, String reason, Float score) {
+        // 1. 유저 조회
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new BusinessException(ErrorCode.USER_NOT_FOUND));
+
+        // 2. 포트폴리오 조회 (없으면 기본 포트폴리오 생성)
+        // 사용자의 포트폴리오 중 하나를 가져오거나 없으면 생성하는 로직
+        List<Portfolio> portfolios = portfolioRepository.findByUser(user);
+        Portfolio portfolio;
+
+        if (portfolios.isEmpty()) {
+            portfolio = Portfolio.builder()
+                    .user(user)
+                    .name("My AI Portfolio") // 기본 이름
+                    .build();
+            portfolio = portfolioRepository.save(portfolio);
+            log.info("[AI] User {}의 기본 포트폴리오 생성 완료", userId);
+        } else {
+            // 편의상 첫 번째 포트폴리오 사용 (추후 로직 고도화 가능)
+            portfolio = portfolios.get(0);
+        }
+
+        // 3. 종목 조회
+        Stock stock = stockRepository.findById(stockCode)
+                .orElseThrow(() -> new BusinessException(ErrorCode.TICKER_NOT_FOUND, "Stock not found: " + stockCode));
+
+        // 4. Action Enum 변환
+        RecommendationAction actionType;
+        try {
+            actionType = RecommendationAction.valueOf(actionStr.toUpperCase());
+        } catch (Exception e) {
+            actionType = RecommendationAction.HOLD; // 기본값
+        }
+
+        // 5. 엔티티 생성 및 저장
+        // Python 봇은 상세 금액 계산(currentHolding 등)을 보내지 않을 수도 있으므로 기본값(0) 처리
+        AIRecommendation recommendation = AIRecommendation.builder()
+                .portfolio(portfolio)
+                .stock(stock)
+                .aiScore(score != null ? score : 50.0f)
+                .actionType(actionType)
+                .reasonSummary(reason)
+                .riskWarning("AI System Auto-generated")
+                .currentHolding(BigDecimal.ZERO)
+                .targetHolding(BigDecimal.ZERO)
+                .targetHoldingPercentage(0.0f)
+                .adjustmentAmount(BigDecimal.ZERO)
+                .build();
+
+        aiRecommendationRepository.save(recommendation);
+        log.info("[AI] 추천 저장 완료 - User: {}, Stock: {}, Action: {}", userId, stockCode, actionStr);
     }
 
     @Transactional(readOnly = true)
