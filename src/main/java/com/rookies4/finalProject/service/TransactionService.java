@@ -84,10 +84,10 @@ public class TransactionService {
         List<Transaction> transactions;
         if (portfolio != null && statusFilter != null) {
             transactions = transactionRepository
-                    .findByUser_IdAndPortfolio_PortfolioIdAndStatusOrderByExecutedAtDesc(userId, portfolioId, statusFilter);
+                    .findByUser_IdAndPortfolios_PortfolioIdAndStatusOrderByExecutedAtDesc(userId, portfolioId, statusFilter);
         } else if (portfolio != null) {
             transactions = transactionRepository
-                    .findByUser_IdAndPortfolio_PortfolioIdOrderByExecutedAtDesc(userId, portfolioId);
+                    .findByUser_IdAndPortfolios_PortfolioIdOrderByExecutedAtDesc(userId, portfolioId);
         } else if (statusFilter != null) {
             transactions = transactionRepository
                     .findByUser_IdAndStatusOrderByExecutedAtDesc(userId, statusFilter);
@@ -176,7 +176,12 @@ public class TransactionService {
                         .build());
 
         if (portfolio != null) {
-            transaction.setPortfolio(portfolio);
+            if (transaction.getPortfolios() == null) {
+                transaction.setPortfolios(new java.util.ArrayList<>());
+            }
+            if (!transaction.getPortfolios().contains(portfolio)) {
+                transaction.getPortfolios().add(portfolio);
+            }
         }
         if (stock != null) {
             transaction.setStock(stock);

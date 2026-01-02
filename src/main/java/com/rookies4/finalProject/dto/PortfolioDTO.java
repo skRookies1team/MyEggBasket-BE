@@ -25,6 +25,7 @@ public class PortfolioDTO {
         private BigDecimal totalAsset = BigDecimal.ZERO;//default =0 설정
         private BigDecimal cashBalance = BigDecimal.ZERO; //default =0 설정
         private RiskLevel riskLevel;
+        private List<String> stockCodes; // 포트폴리오에 포함할 종목 코드 리스트
 
     }
     @Data

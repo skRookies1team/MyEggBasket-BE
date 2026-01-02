@@ -8,6 +8,8 @@ import lombok.*;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
+import java.util.ArrayList;
+import java.util.List;
 
 @Entity
 @Table(name = "transactions")
@@ -27,9 +29,14 @@ public class Transaction {
     @JoinColumn(name = "user_id")
     private User user;
 
-    @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "portfolio_id")
-    private Portfolio portfolio;
+    @ManyToMany(fetch = FetchType.LAZY)
+    @JoinTable(
+        name = "transaction_portfolio",
+        joinColumns = @JoinColumn(name = "transaction_id"),
+        inverseJoinColumns = @JoinColumn(name = "portfolio_id")
+    )
+    @Builder.Default
+    private List<Portfolio> portfolios = new ArrayList<>();
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "stock_code")
@@ -89,7 +96,7 @@ public class Transaction {
         return "Transaction{" +
                 "transactionId=" + transactionId +
                 ", userId=" + (user != null ? user.getId() : null) +
-                ", portfolioId=" + (portfolio != null ? portfolio.getPortfolioId() : null) +
+                ", portfolioIds=" + (portfolios != null ? portfolios.stream().map(Portfolio::getPortfolioId).toList() : null) +
                 ", stockCode=" + (stock != null ? stock.getStockCode() : null) +
                 ", type='" + type + '\'' +
                 ", quantity=" + quantity +

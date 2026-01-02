@@ -54,6 +54,11 @@ public class Portfolio {
     @Builder.Default
     private List<HistoryReport> historyReports = new ArrayList<>();
 
+    // 거래 내역 (다대다)
+    @ManyToMany(mappedBy = "portfolios", fetch = FetchType.LAZY)
+    @Builder.Default
+    private List<Transaction> transactions = new ArrayList<>();
+
     // 연관관계 편의 메서드
     public void addHolding(Holding holding) {
         holdings.add(holding);

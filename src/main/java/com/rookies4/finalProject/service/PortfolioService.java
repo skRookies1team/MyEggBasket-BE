@@ -6,6 +6,7 @@ import com.rookies4.finalProject.dto.PortfolioDTO;
 import com.rookies4.finalProject.exception.BusinessException;
 import com.rookies4.finalProject.exception.ErrorCode;
 import com.rookies4.finalProject.repository.PortfolioRepository;
+import com.rookies4.finalProject.repository.TransactionRepository;
 import com.rookies4.finalProject.repository.UserRepository;
 import com.rookies4.finalProject.security.SecurityUtil;
 import lombok.RequiredArgsConstructor;
@@ -24,6 +25,7 @@ import java.util.stream.Collectors;
 public class PortfolioService {
     private final PortfolioRepository portfolioRepository;
     private final UserRepository userRepository;
+    private final TransactionRepository transactionRepository;
 
     //1. Portfolio 생성
     public PortfolioDTO.PortfolioResponse createPortfolio(PortfolioDTO.PortfolioRequest request){
@@ -49,6 +51,27 @@ public class PortfolioService {
                 .build();
 
         Portfolio saved = portfolioRepository.save(portfolio);
+
+        // 4. 선택된 종목들의 거래 내역에 포트폴리오 추가 (다대다)
+        if (request.getStockCodes() != null && !request.getStockCodes().isEmpty()) {
+            for (String stockCode : request.getStockCodes()) {
+                if (stockCode != null && !stockCode.isBlank()) {
+                    List<com.rookies4.finalProject.domain.entity.Transaction> transactions =
+                            transactionRepository.findByUser_IdAndStock_StockCodeOrderByExecutedAtDesc(user.getId(), stockCode);
+                    for (com.rookies4.finalProject.domain.entity.Transaction tx : transactions) {
+                        if (tx.getPortfolios() == null) {
+                            tx.setPortfolios(new java.util.ArrayList<>());
+                        }
+                        if (!tx.getPortfolios().contains(saved)) {
+                            tx.getPortfolios().add(saved);
+                            transactionRepository.save(tx);
+                        }
+                    }
+                    log.debug("[Portfolio] 종목 {} 거래 내역 {} 건 할당", stockCode, transactions.size());
+                }
+            }
+        }
+
         log.info("[Portfolio] 포트폴리오 생성 성공 - UserId: {}, PortfolioName: {}", user.getId(), request.getName());
         return PortfolioDTO.PortfolioResponse.fromEntity(saved);
     }
@@ -159,6 +182,71 @@ public class PortfolioService {
         
         log.info("[Portfolio] 포트폴리오 보유종목 조회 성공 - UserId: {}, PortfolioId: {}", portfolio.getUser().getId(), portfolioId);
         return PortfolioDTO.PortfolioHoldingResponse.fromEntity(portfolio);
+    }
+
+    //7. 포트폴리오에 종목 추가 (기존 거래 재할당)
+    public void addStocksToPortfolio(Long portfolioId, List<String> stockCodes) {
+        Portfolio portfolio = portfolioRepository.findById(portfolioId)
+                .orElseThrow(() -> new BusinessException(ErrorCode.PORTFOLIO_NOT_FOUND));
+
+        // 권한 확인
+        validatePortfolioOwnership(portfolio);
+
+        if (stockCodes == null || stockCodes.isEmpty()) {
+            return;
+        }
+
+        User user = portfolio.getUser();
+        for (String stockCode : stockCodes) {
+            if (stockCode != null && !stockCode.isBlank()) {
+                List<com.rookies4.finalProject.domain.entity.Transaction> transactions =
+                        transactionRepository.findByUser_IdAndStock_StockCodeOrderByExecutedAtDesc(user.getId(), stockCode);
+                for (com.rookies4.finalProject.domain.entity.Transaction tx : transactions) {
+                    if (tx.getPortfolios() == null) {
+                        tx.setPortfolios(new java.util.ArrayList<>());
+                    }
+                    if (!tx.getPortfolios().contains(portfolio)) {
+                        tx.getPortfolios().add(portfolio);
+                        transactionRepository.save(tx);
+                    }
+                }
+                log.debug("[Portfolio] 종목 {} 거래 내역 {} 건 추가", stockCode, transactions.size());
+            }
+        }
+
+        log.info("[Portfolio] 포트폴리오 종목 추가 성공 - UserId: {}, PortfolioId: {}, StockCount: {}", 
+                user.getId(), portfolioId, stockCodes.size());
+    }
+    
+    //8. 포트폴리오에서 종목 제거 (해당 거래에서 포트폴리오 삭제)
+    public void removeStocksFromPortfolio(Long portfolioId, List<String> stockCodes) {
+        Portfolio portfolio = portfolioRepository.findById(portfolioId)
+                .orElseThrow(() -> new BusinessException(ErrorCode.PORTFOLIO_NOT_FOUND));
+
+        // 권한 확인
+        validatePortfolioOwnership(portfolio);
+
+        if (stockCodes == null || stockCodes.isEmpty()) {
+            return;
+        }
+
+        User user = portfolio.getUser();
+        for (String stockCode : stockCodes) {
+            if (stockCode != null && !stockCode.isBlank()) {
+                List<com.rookies4.finalProject.domain.entity.Transaction> transactions =
+                        transactionRepository.findByUser_IdAndStock_StockCodeOrderByExecutedAtDesc(user.getId(), stockCode);
+                for (com.rookies4.finalProject.domain.entity.Transaction tx : transactions) {
+                    if (tx.getPortfolios() != null && tx.getPortfolios().contains(portfolio)) {
+                        tx.getPortfolios().remove(portfolio);
+                        transactionRepository.save(tx);
+                    }
+                }
+                log.debug("[Portfolio] 종목 {} 거래 내역 {} 건 제거", stockCode, transactions.size());
+            }
+        }
+
+        log.info("[Portfolio] 포트폴리오 종목 제거 성공 - UserId: {}, PortfolioId: {}, StockCount: {}", 
+                user.getId(), portfolioId, stockCodes.size());
     }
     
     // 헬퍼 메서드: BigDecimal이 null인 경우 0으로 변환

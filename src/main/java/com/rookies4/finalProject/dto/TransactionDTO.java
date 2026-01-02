@@ -6,6 +6,7 @@ import com.rookies4.finalProject.domain.enums.TransactionType;
 import com.rookies4.finalProject.domain.enums.TriggerSource;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
+import java.util.List;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
@@ -20,8 +21,8 @@ public class TransactionDTO {
     public static class Response {
         private Long transactionId;
 
-        private Long portfolioId; // 포트폴리오 식별자
-        private String portfolioName; // 포트폴리오 이름
+        private List<Long> portfolioIds; // 포트폴리오 ID 리스트
+        private List<String> portfolioNames; // 포트폴리오 이름 리스트
 
         // Stock 정보 매핑
         private String stockCode; // 종목코드
@@ -45,10 +46,22 @@ public class TransactionDTO {
         private LocalDateTime executedAt;
 
         public static Response fromEntity(Transaction transaction) {
+            List<Long> portfolioIds = null;
+            List<String> portfolioNames = null;
+            
+            if (transaction.getPortfolios() != null && !transaction.getPortfolios().isEmpty()) {
+                portfolioIds = transaction.getPortfolios().stream()
+                        .map(p -> p.getPortfolioId())
+                        .toList();
+                portfolioNames = transaction.getPortfolios().stream()
+                        .map(p -> p.getName())
+                        .toList();
+            }
+            
             return Response.builder()
                     .transactionId(transaction.getTransactionId())
-                    .portfolioId(transaction.getPortfolio() != null ? transaction.getPortfolio().getPortfolioId() : null)
-                    .portfolioName(transaction.getPortfolio() != null ? transaction.getPortfolio().getName() : null)
+                    .portfolioIds(portfolioIds)
+                    .portfolioNames(portfolioNames)
                     .stockCode(transaction.getStock() != null ? transaction.getStock().getStockCode() : null)
                     .stockName(transaction.getStock() != null ? transaction.getStock().getName() : null)
 
