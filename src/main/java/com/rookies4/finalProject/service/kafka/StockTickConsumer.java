@@ -97,7 +97,7 @@ public class StockTickConsumer {
     private StockTickDTO toStockTickDTO(Map<String, Object> data) {
         return StockTickDTO.builder()
                 .type("STOCK_TICK")
-                .stockCode(asString(data.get("stckShrnIscd")))
+                .stockCode(asString(data.get("stockCode")))
                 .tickTime(asString(data.get("stckCntgHour")))
 
                 .currentPrice(getBigDecimal(data, "stckPrpr"))
@@ -117,7 +117,7 @@ public class StockTickConsumer {
 
         return OrderBookDTO.builder()
                 .type("ORDER_BOOK")
-                .stockCode(asString(data.get("stckShrnIscd")))
+                .stockCode(asString(data.get("stockCode")))
                 .asks(asks)
                 .bids(bids)
                 .totalAskQty(getLong(data, "totalAskQty"))
