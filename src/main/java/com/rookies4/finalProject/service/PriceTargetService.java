@@ -4,14 +4,13 @@ import com.rookies4.finalProject.domain.entity.PriceTarget;
 import com.rookies4.finalProject.domain.entity.Stock;
 import com.rookies4.finalProject.domain.entity.User;
 import com.rookies4.finalProject.dto.PriceTargetDTO;
-import com.rookies4.finalProject.dto.kafka.PriceAlertEventDTO;
 import com.rookies4.finalProject.exception.BusinessException;
 import com.rookies4.finalProject.exception.ErrorCode;
 import com.rookies4.finalProject.repository.PriceTargetRepository;
 import com.rookies4.finalProject.repository.StockRepository;
 import com.rookies4.finalProject.repository.UserRepository;
 import com.rookies4.finalProject.security.SecurityUtil;
-import com.rookies4.finalProject.service.kafka.PriceAlertEventProducer;
+import java.util.ArrayList;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -20,10 +19,9 @@ import org.springframework.transaction.annotation.Transactional;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.List;
-import java.util.UUID;
 import java.util.stream.Collectors;
 
-// 목표가 설정/관리 서비스
+// 목표가 관리 서비스
 @Slf4j
 @Service
 @RequiredArgsConstructor
@@ -33,7 +31,8 @@ public class PriceTargetService {
     private final PriceTargetRepository priceTargetRepository;
     private final StockRepository stockRepository;
     private final UserRepository userRepository;
-    private final PriceAlertEventProducer priceAlertEventProducer;
+
+    private static final int ALERT_COOLDOWN_MINUTES = 30;
 
     // 상한가 설정 (1개만 허용, 기존 것 있으면 덮어쓰기)
     public PriceTargetDTO.PriceTargetResponse setUpperTarget(PriceTargetDTO.SetTargetRequest request) {
@@ -64,13 +63,13 @@ public class PriceTargetService {
             // 기존 레코드 업데이트
             priceTarget.setUpperTarget(request.getTargetPrice());
             priceTarget.setIsEnabled(true);
+
+            // 목표가 재설정 시 상한 알림 상태 초기화
+            priceTarget.setUpperTriggered(false);
+            priceTarget.setUpperTriggeredAt(null);
         }
 
         PriceTarget saved = priceTargetRepository.save(priceTarget);
-
-        // Kafka 이벤트 발행
-        publishPriceAlertEvent(user.getId(), stock.getStockCode(), stock.getName(),
-                request.getTargetPrice(), PriceAlertEventDTO.AlertType.UPPER);
 
         return PriceTargetDTO.PriceTargetResponse.fromEntity(saved);
     }
@@ -104,13 +103,13 @@ public class PriceTargetService {
             // 기존 레코드 업데이트
             priceTarget.setLowerTarget(request.getTargetPrice());
             priceTarget.setIsEnabled(true);
+
+            // 목표가 재설정 시 하한 알림 상태 초기화
+            priceTarget.setLowerTriggered(false);
+            priceTarget.setLowerTriggeredAt(null);
         }
 
         PriceTarget saved = priceTargetRepository.save(priceTarget);
-
-        // Kafka 이벤트 발행
-        publishPriceAlertEvent(user.getId(), stock.getStockCode(), stock.getName(),
-                request.getTargetPrice(), PriceAlertEventDTO.AlertType.LOWER);
 
         return PriceTargetDTO.PriceTargetResponse.fromEntity(saved);
     }
@@ -140,10 +139,6 @@ public class PriceTargetService {
         } else {
             priceTargetRepository.save(priceTarget);
         }
-
-        // Kafka 이벤트 발행 (취소 알림)
-        publishPriceAlertCancelEvent(user.getId(), stock.getStockCode(), stock.getName(),
-                clearedTarget, PriceAlertEventDTO.AlertType.UPPER);
     }
 
     // 하한가 취소
@@ -171,10 +166,6 @@ public class PriceTargetService {
         } else {
             priceTargetRepository.save(priceTarget);
         }
-
-        // Kafka 이벤트 발행 (취소 알림)
-        publishPriceAlertCancelEvent(user.getId(), stock.getStockCode(), stock.getName(),
-                clearedTarget, PriceAlertEventDTO.AlertType.LOWER);
     }
 
     // 내 목표가 목록 조회
@@ -186,7 +177,7 @@ public class PriceTargetService {
                 .stream()
                 .map(PriceTargetDTO.PriceTargetResponse::fromEntity)
                 .collect(Collectors.toList());
-        
+
         log.info("[PriceTarget] 내 목표가 목록 조회 성공 - UserId: {}, Count: {}", user.getId(), targets.size());
         return targets;
     }
@@ -222,53 +213,71 @@ public class PriceTargetService {
                         "종목을 찾을 수 없습니다: " + stockCode));
     }
 
-    // Kafka 목표가 알림 이벤트 발행
-    private void publishPriceAlertEvent(Long userId, String stockCode, String stockName,
-                                        BigDecimal targetPrice, PriceAlertEventDTO.AlertType alertType) {
-        try {
-            PriceAlertEventDTO event = PriceAlertEventDTO.builder()
-                    .eventId(UUID.randomUUID().toString())
-                    .userId(userId)
-                    .stockCode(stockCode)
-                    .stockName(stockName)
-                    .triggerPrice(targetPrice)
-                    .currentPrice(targetPrice)
-                    .alertType(alertType)
-                    .eventType(PriceAlertEventDTO.EventType.SET)
-                    .timestamp(LocalDateTime.now())
-                    .build();
-
-            priceAlertEventProducer.publishPriceAlertEvent(event);
-            log.info("[Price Alert] 목표가 설정 성공 - UserId: {}, StockCode: {}, AlertType: {}, TargetPrice: {}",
-                    userId, stockCode, alertType, targetPrice);
-        } catch (Exception e) {
-            log.error("[Price Alert] 목표가 설정 실패 - UserId: {}, StockCode: {}, Error: {}",
-                    userId, stockCode, e.getMessage(), e);
+    // 실시간 체결가 수신 시 목표가 도달 여부 판단
+    public List<PriceTarget> evaluate(String stockCode, BigDecimal currentPrice) {
+        if (stockCode == null || currentPrice == null) {
+            return List.of();
         }
+
+        List<PriceTarget> targets =
+                priceTargetRepository.findByStockCodeAndEnabled(stockCode);
+
+        List<PriceTarget> reachedTargets = new ArrayList<>();
+        LocalDateTime now = LocalDateTime.now();
+
+        for (PriceTarget target : targets) {
+            if (checkUpperTarget(target, currentPrice, now)) {
+                reachedTargets.add(target);
+            }
+            if (checkLowerTarget(target, currentPrice, now)) {
+                reachedTargets.add(target);
+            }
+        }
+
+        return reachedTargets;
     }
 
-    // Kafka 목표가 취소 이벤트 발행
-    private void publishPriceAlertCancelEvent(Long userId, String stockCode, String stockName,
-                                              BigDecimal canceledPrice, PriceAlertEventDTO.AlertType alertType) {
-        try {
-            PriceAlertEventDTO event = PriceAlertEventDTO.builder()
-                    .eventId(UUID.randomUUID().toString())
-                    .userId(userId)
-                    .stockCode(stockCode)
-                    .stockName(stockName)
-                    .triggerPrice(canceledPrice)
-                    .currentPrice(null) // 취소 시에는 현재가 불필요
-                    .alertType(alertType)
-                    .eventType(PriceAlertEventDTO.EventType.CANCELED)
-                    .timestamp(LocalDateTime.now())
-                    .build();
+    private boolean checkUpperTarget(
+            PriceTarget target,
+            BigDecimal currentPrice,
+            LocalDateTime now
+    ) {
+        if (target.getUpperTarget() == null) return false;
+        if (currentPrice.compareTo(target.getUpperTarget()) < 0) return false;
 
-            priceAlertEventProducer.publishPriceAlertEvent(event);
-            log.info("[Price Alert] 목표가 취소 성공 - UserId: {}, StockCode: {}, AlertType: {}",
-                    userId, stockCode, alertType);
-        } catch (Exception e) {
-            log.error("[Price Alert] 목표가 취소 실패 - UserId: {}, StockCode: {}, Error: {}",
-                    userId, stockCode, e.getMessage(), e);
+        if (Boolean.TRUE.equals(target.getUpperTriggered())
+                && target.getUpperTriggeredAt() != null
+                && target.getUpperTriggeredAt()
+                .plusMinutes(ALERT_COOLDOWN_MINUTES)
+                .isAfter(now)) {
+            return false;
         }
+
+        target.setUpperTriggered(true);
+        target.setUpperTriggeredAt(now);
+        priceTargetRepository.save(target);
+        return true;
+    }
+
+    private boolean checkLowerTarget(
+            PriceTarget target,
+            BigDecimal currentPrice,
+            LocalDateTime now
+    ) {
+        if (target.getLowerTarget() == null) return false;
+        if (currentPrice.compareTo(target.getLowerTarget()) > 0) return false;
+
+        if (Boolean.TRUE.equals(target.getLowerTriggered())
+                && target.getLowerTriggeredAt() != null
+                && target.getLowerTriggeredAt()
+                .plusMinutes(ALERT_COOLDOWN_MINUTES)
+                .isAfter(now)) {
+            return false;
+        }
+
+        target.setLowerTriggered(true);
+        target.setLowerTriggeredAt(now);
+        priceTargetRepository.save(target);
+        return true;
     }
 }

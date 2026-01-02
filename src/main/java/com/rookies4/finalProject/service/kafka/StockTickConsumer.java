@@ -1,13 +1,19 @@
 package com.rookies4.finalProject.service.kafka;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.rookies4.finalProject.domain.entity.PriceTarget;
+import com.rookies4.finalProject.dto.kafka.OrderBookDTO;
 import com.rookies4.finalProject.dto.kafka.StockTickDTO;
+import com.rookies4.finalProject.service.PriceTargetService;
+import java.time.LocalDateTime;
+import java.util.List;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.kafka.annotation.KafkaListener;
 import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.stereotype.Service;
 
+import java.math.BigDecimal;
 import java.util.Map;
 
 @Slf4j
@@ -15,41 +21,190 @@ import java.util.Map;
 @RequiredArgsConstructor
 public class StockTickConsumer {
 
-    private final PriceAlertService priceAlertService;
+    private final PriceTargetService priceTargetService;
     private final SimpMessagingTemplate messagingTemplate;
-    private final ObjectMapper objectMapper; // 데이터 변환용
+    private final ObjectMapper objectMapper;
 
+    // Kafka stock-ticks 토픽 리스닝
     @KafkaListener(
             topics = "stock-ticks",
-            groupId = "${spring.kafka.consumer.group-id}",
+            groupId = "be-stock-ticks",
             containerFactory = "stockTickKafkaListenerContainerFactory"
     )
-    public void consumeStockData(Map<String, Object> data) {
+    public void consumeStockData(String message) {
         try {
-            String type = (String) data.get("type");
-            String stockCode = (String) data.get("stockCode");
+            Map<String, Object> data =
+                    objectMapper.readValue(message, Map.class);
 
-            if (stockCode == null) return;
-
-            if ("STOCK_TICK".equals(type)) {
-                // 1. 체결가 처리
-                StockTickDTO stockTick = objectMapper.convertValue(data, StockTickDTO.class);
-
-                // WS 전송
-                messagingTemplate.convertAndSend("/topic/realtime-price/" + stockCode, stockTick);
-
-                // 알림 체크
-                priceAlertService.evaluatePriceAlerts(stockCode, stockTick.getCurrentPrice());
-
-            } else if ("ORDER_BOOK".equals(type)) {
-                // 2. 호가 처리
-                // Map을 DTO로 변환하거나, 그대로 전송해도 무방합니다. 여기서는 Map 그대로 전송 예시
-                // 프론트 구독 경로: /topic/stock-order-book/005930
-                messagingTemplate.convertAndSend("/topic/stock-order-book/" + stockCode, data);
+            String type = asString(data.get("type"));
+            if (type == null) {
+                log.debug("[Kafka] type missing: {}", data);
+                return;
             }
 
+            switch (type) {
+                case "STOCK_TICK" -> handleStockTick(data); // 실시간 체결가
+                case "ORDER_BOOK" -> handleOrderBook(data); // 실시간 호가
+                default -> log.debug("[Kafka] ignored type={}", type);
+            }
         } catch (Exception e) {
-            log.error("Error processing stock data: {}", e.getMessage());
+            log.error("[Kafka] 메시지 파싱 실패: {}", message, e);
         }
+    }
+
+    // 실시간 체결가(STOCK_TICK) 처리
+    private void handleStockTick(Map<String, Object> data) {
+        log.info("[Kafka][STOCK_TICK] raw={}", data);
+
+        try {
+            StockTickDTO tick = toStockTickDTO(data);
+            String stockCode = tick.getStockCode();
+
+            if (stockCode == null) {
+                log.warn("[Kafka][STOCK_TICK] stockCode missing: {}", data);
+                return;
+            }
+
+            sendRealtimePrice(stockCode, tick);
+            evaluatePriceTargetAndNotify(stockCode, tick.getCurrentPrice());
+
+        } catch (Exception e) {
+            log.error("[Kafka][STOCK_TICK] 처리 실패: {}", e.getMessage(), e);
+        }
+    }
+
+    // 실시간 호가(ORDER_BOOK) 처리
+    private void handleOrderBook(Map<String, Object> data) {
+        log.info("[Kafka][ORDER_BOOK] raw={}", data);
+
+        try {
+            OrderBookDTO orderBook = toOrderBookDTO(data);
+            String stockCode = orderBook.getStockCode();
+
+            if (stockCode == null) {
+                log.warn("[Kafka][ORDER_BOOK] stockCode missing: {}", data);
+                return;
+            }
+
+            sendOrderBook(stockCode, orderBook);
+
+        } catch (Exception e) {
+            log.error("[Kafka][ORDER_BOOK] 처리 실패: {}", e.getMessage(), e);
+        }
+    }
+
+    // kafka 메시지 DTO로 변환 - StockTick
+    private StockTickDTO toStockTickDTO(Map<String, Object> data) {
+        return StockTickDTO.builder()
+                .type("STOCK_TICK")
+                .stockCode(asString(data.get("stockCode")))
+                .tickTime(asString(data.get("stckCntgHour")))
+
+                .currentPrice(getBigDecimal(data, "stckPrpr"))
+                .diff(getBigDecimal(data, "prdyVrss"))
+                .diffRate(getBigDecimal(data, "prdyCtrt"))
+
+                .volume(getBigDecimal(data, "acmlVol"))
+                .tradingValue(getBigDecimal(data, "acmlTrPbmn"))
+                .build();
+    }
+
+    // kafka 메시지 DTO로 변환 - OrderBook
+    private OrderBookDTO toOrderBookDTO(Map<String, Object> data) {
+
+        List<OrderBookDTO.OrderItem> asks = buildOrderItems(data, "ask");
+        List<OrderBookDTO.OrderItem> bids = buildOrderItems(data, "bid");
+
+        return OrderBookDTO.builder()
+                .type("ORDER_BOOK")
+                .stockCode(asString(data.get("stockCode")))
+                .asks(asks)
+                .bids(bids)
+                .totalAskQty(getLong(data, "totalAskQty"))
+                .totalBidQty(getLong(data, "totalBidQty"))
+                .build();
+    }
+
+    // 실시간 체결가 프론트로 전송
+    private void sendRealtimePrice(String stockCode, StockTickDTO tick) {
+        messagingTemplate.convertAndSend(
+                "/topic/realtime-price/" + stockCode,
+                tick
+        );
+    }
+
+    // 실시간 호가 프론트로 전송
+    private void sendOrderBook(String stockCode, OrderBookDTO orderBook) {
+        messagingTemplate.convertAndSend(
+                "/topic/stock-order-book/" + stockCode,
+                orderBook
+        );
+    }
+
+    private void evaluatePriceTargetAndNotify(String stockCode, BigDecimal currentPrice) {
+        if (currentPrice == null) {
+            return;
+        }
+
+        // 목표가 도달한 PriceTarget 목록 반환
+        List<PriceTarget> reachedTargets =
+                priceTargetService.evaluate(stockCode, currentPrice);
+
+        for (PriceTarget target : reachedTargets) {
+            sendPriceAlert(target, currentPrice);
+        }
+    }
+
+    // 목표가 도달 알람을 프론트로 전송
+    private void sendPriceAlert(PriceTarget target, BigDecimal currentPrice) {
+        Long userId = target.getUser().getId();
+
+        messagingTemplate.convertAndSend(
+                "/topic/price-alert/" + userId,
+                buildAlertPayload(target, currentPrice)
+        );
+    }
+
+    // 프론트로 보낼 목표가 알람 payload 생성
+    private Map<String, Object> buildAlertPayload(PriceTarget target, BigDecimal currentPrice) {
+        return Map.of(
+                "userId", target.getUser().getId(),
+                "stockCode", target.getStock().getStockCode(),
+                "currentPrice", currentPrice,
+                "upperTarget", target.getUpperTarget(),
+                "lowerTarget", target.getLowerTarget(),
+                "triggeredAt", LocalDateTime.now()
+        );
+    }
+
+    private List<OrderBookDTO.OrderItem> buildOrderItems(Map<String, Object> data, String key) {
+        List<Map<String, Object>> rawItems =
+                (List<Map<String, Object>>) data.get(key);
+
+        if (rawItems == null) {
+            return List.of();
+        }
+
+        return rawItems.stream()
+                .map(item -> new OrderBookDTO.OrderItem(
+                        getBigDecimal(item, "price"),
+                        getLong(item, "qty")
+                ))
+                .toList();
+    }
+
+    // Object → String 안전 변환
+    private String asString(Object v) {
+        return v == null ? null : String.valueOf(v);
+    }
+
+    private BigDecimal getBigDecimal(Map<String, Object> data, String key) {
+        Object v = data.get(key);
+        return v == null ? null : new BigDecimal(v.toString());
+    }
+
+    private Long getLong(Map<String, Object> data, String key) {
+        Object v = data.get(key);
+        return v == null ? null : Long.parseLong(v.toString());
     }
 }

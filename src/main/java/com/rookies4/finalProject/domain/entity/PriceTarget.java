@@ -58,6 +58,24 @@ public class PriceTarget {
     @Builder.Default
     private Boolean isEnabled = true;
 
+    // 상한 알림 여부
+    @Column(name = "upper_triggered", nullable = false)
+    @Builder.Default
+    private Boolean upperTriggered = false;
+
+    // 상한 알림 시각
+    @Column(name = "upper_triggered_at")
+    private LocalDateTime upperTriggeredAt;
+
+    // 하한 알림 여부
+    @Column(name = "lower_triggered", nullable = false)
+    @Builder.Default
+    private Boolean lowerTriggered = false;
+
+    // 하한 알림 시각
+    @Column(name = "lower_triggered_at")
+    private LocalDateTime lowerTriggeredAt;
+
     // 생성 시간
     @Column(name = "created_at", nullable = false, updatable = false)
     private LocalDateTime createdAt;
