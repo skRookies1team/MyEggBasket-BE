@@ -53,21 +53,42 @@ public class PortfolioService {
         Portfolio saved = portfolioRepository.save(portfolio);
 
         // 4. 선택된 종목들의 거래 내역에 포트폴리오 추가 (다대다)
+        // 단, 현재 실제 보유 수량 > 0인 종목만 포함
         if (request.getStockCodes() != null && !request.getStockCodes().isEmpty()) {
             for (String stockCode : request.getStockCodes()) {
                 if (stockCode != null && !stockCode.isBlank()) {
-                    List<com.rookies4.finalProject.domain.entity.Transaction> transactions =
-                            transactionRepository.findByUser_IdAndStock_StockCodeOrderByExecutedAtDesc(user.getId(), stockCode);
-                    for (com.rookies4.finalProject.domain.entity.Transaction tx : transactions) {
-                        if (tx.getPortfolios() == null) {
-                            tx.setPortfolios(new java.util.ArrayList<>());
-                        }
-                        if (!tx.getPortfolios().contains(saved)) {
-                            tx.getPortfolios().add(saved);
-                            transactionRepository.save(tx);
+                    // 해당 종목의 현재 보유 수량 확인
+                    // 모든 사용자 포트폴리오(또는 KIS-REAL 포트폴리오)에서 quantity > 0인 holding을 찾음
+                    boolean hasValidHolding = false;
+                    List<Portfolio> userPortfolios = portfolioRepository.findByUser(user);
+                    for (Portfolio p : userPortfolios) {
+                        if (p.getHoldings() != null) {
+                            hasValidHolding = p.getHoldings().stream()
+                                    .anyMatch(h -> h.getStock() != null
+                                            && stockCode.equals(h.getStock().getStockCode())
+                                            && h.getQuantity() != null
+                                            && h.getQuantity() > 0);
+                            if (hasValidHolding) break;
                         }
                     }
-                    log.debug("[Portfolio] 종목 {} 거래 내역 {} 건 할당", stockCode, transactions.size());
+
+                    // 현재 보유 중인 종목만 거래 내역 추가
+                    if (hasValidHolding) {
+                        List<com.rookies4.finalProject.domain.entity.Transaction> transactions =
+                                transactionRepository.findByUser_IdAndStock_StockCodeOrderByExecutedAtDesc(user.getId(), stockCode);
+                        for (com.rookies4.finalProject.domain.entity.Transaction tx : transactions) {
+                            if (tx.getPortfolios() == null) {
+                                tx.setPortfolios(new java.util.ArrayList<>());
+                            }
+                            if (!tx.getPortfolios().contains(saved)) {
+                                tx.getPortfolios().add(saved);
+                                transactionRepository.save(tx);
+                            }
+                        }
+                        log.debug("[Portfolio] 종목 {} 거래 내역 {} 건 할당", stockCode, transactions.size());
+                    } else {
+                        log.debug("[Portfolio] 종목 {} 는 현재 보유 수량이 0이어서 제외", stockCode);
+                    }
                 }
             }
         }
@@ -109,8 +130,8 @@ public class PortfolioService {
             portfolio.getUser().getId();
         }
         
-        // Holdings 컬렉션 초기화 및 각 Holding의 Stock 초기화
-        // DTO 변환 시 필요하므로 트랜잭션 내에서 초기화
+        // Holdings 컬렉션에서 quantity <= 0인 것을 필터링 및 표시
+        // DTO 변환 시 필요하므로 트랜잭션 내에서 처리
         if (portfolio.getHoldings() != null && !portfolio.getHoldings().isEmpty()) {
             portfolio.getHoldings().forEach(holding -> {
                 if (holding.getStock() != null) {
@@ -166,6 +187,11 @@ public class PortfolioService {
         
         // 권한 확인: 포트폴리오 소유자만 삭제 가능
         validatePortfolioOwnership(portfolio);
+
+        // 거래-포트폴리오 조인 먼저 해제 (Many-to-Many)
+        if (portfolio.getTransactions() != null && !portfolio.getTransactions().isEmpty()) {
+            portfolio.getTransactions().forEach(tx -> tx.getPortfolios().remove(portfolio));
+        }
         
         log.info("[Portfolio] 포트폴리오 삭제 성공 - UserId: {}, PortfolioId: {}", portfolio.getUser().getId(), portfolioId);
         portfolioRepository.deleteById(portfolioId);
@@ -179,6 +205,16 @@ public class PortfolioService {
         
         // 권한 확인: 포트폴리오 소유자만 조회 가능
         validatePortfolioOwnership(portfolio);
+        
+        // Stock 엔티티 초기화 (lazy loading 방지)
+        if (portfolio.getHoldings() != null && !portfolio.getHoldings().isEmpty()) {
+            portfolio.getHoldings().forEach(holding -> {
+                if (holding.getStock() != null) {
+                    holding.getStock().getStockCode();
+                    holding.getStock().getName();
+                }
+            });
+        }
         
         log.info("[Portfolio] 포트폴리오 보유종목 조회 성공 - UserId: {}, PortfolioId: {}", portfolio.getUser().getId(), portfolioId);
         return PortfolioDTO.PortfolioHoldingResponse.fromEntity(portfolio);

@@ -50,10 +50,11 @@ public class PortfolioDTO {
         private List<HistoryReport> historyReports = null;
 
         public static PortfolioDTO.PortfolioResponse fromEntity(Portfolio portfolio) {
-            // Holdings를 DTO로 변환
+            // Holdings를 DTO로 변환 (quantity > 0인 것만 포함)
             List<HoldingDTO.HoldingResponse> holdingsDto = null;
             if (portfolio.getHoldings() != null && !portfolio.getHoldings().isEmpty()) {
                 holdingsDto = portfolio.getHoldings().stream()
+                        .filter(h -> h.getQuantity() != null && h.getQuantity() > 0)
                         .map(HoldingDTO.HoldingResponse::fromEntity)
                         .collect(java.util.stream.Collectors.toList());
             }
@@ -77,12 +78,20 @@ public class PortfolioDTO {
     @Builder
     public static class PortfolioHoldingResponse{
         private Long portfolioId;
-        private List<Holding> holdings;
+        private List<HoldingDTO.HoldingResponse> holdings;
 
         public static PortfolioDTO.PortfolioHoldingResponse fromEntity(Portfolio portfolio) {
+            // quantity > 0인 holding만 포함
+            List<HoldingDTO.HoldingResponse> holdingsDto = null;
+            if (portfolio.getHoldings() != null && !portfolio.getHoldings().isEmpty()) {
+                holdingsDto = portfolio.getHoldings().stream()
+                        .filter(h -> h.getQuantity() != null && h.getQuantity() > 0)
+                        .map(HoldingDTO.HoldingResponse::fromEntity)
+                        .collect(java.util.stream.Collectors.toList());
+            }
             return PortfolioHoldingResponse.builder()
                     .portfolioId(portfolio.getPortfolioId())
-                    .holdings(portfolio.getHoldings())
+                    .holdings(holdingsDto)
                     .build();
         }
     }

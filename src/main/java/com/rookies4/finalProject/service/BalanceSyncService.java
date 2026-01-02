@@ -91,6 +91,11 @@ public class BalanceSyncService {
                         "사용자를 찾을 수 없습니다. userId=" + userId
                 ));
 
+        // KIS가 실패 응답을 준 경우 동기화를 중단한다.
+        if (kisBalance.getRtCd() != null && !"0".equals(kisBalance.getRtCd())) {
+            throw new BusinessException(ErrorCode.KIS_API_ERROR, "KIS 잔고 응답이 실패 상태입니다.");
+        }
+
         // 1. 포트폴리오 찾기 또는 생성
         Portfolio portfolio = findOrCreateKisPortfolio(user, useVirtual);
 
@@ -106,12 +111,13 @@ public class BalanceSyncService {
                         (existing, replacement) -> existing
                 ));
 
-        // 2. [삭제] DB에는 있지만 KIS에는 없는 종목 제거
+        // 2. [삭제] DB에는 있지만 KIS에는 없거나, 또는 quantity <= 0인 종목 제거
         List<Holding> holdings = portfolio.getHoldings();
         int removedCount = holdings.size();
         holdings.removeIf(h -> {
             String code = (h.getStock() != null) ? h.getStock().getStockCode() : null;
-            return code == null || !kisMap.containsKey(code);
+            // KIS에 없거나, quantity <= 0인 holding 제거
+            return code == null || !kisMap.containsKey(code) || (h.getQuantity() != null && h.getQuantity() <= 0);
         });
         removedCount -= holdings.size();
 
@@ -163,10 +169,62 @@ public class BalanceSyncService {
             portfolio.setCashBalance(toBigDecimal(s.getDncaTotAmt()));
         }
 
-        // 5. 저장
+        // 5. 저장 (KIS 포트폴리오)
         portfolioRepository.save(portfolio);
 
+        // 6. 동일 사용자, 동일 종목을 이미 보유한 다른 포트폴리오의 수량/평단만 동기화한다.
+        syncExistingHoldingsToOtherPortfolios(user, portfolio);
+
         log.info("[SYNC] 동기화 완료 - 추가: {}, 수정: {}, 삭제: {}", addedCount, updatedCount, removedCount);
+    }
+
+    /**
+     * 사용자의 모든 포트폴리오에서 KIS에 없거나 quantity≤0인 종목을 제거한다.
+     * - KIS에 없는 종목: 전량 매도한 것
+     * - quantity≤0인 종목: 보유하지 않는 것
+     */
+    private void syncExistingHoldingsToOtherPortfolios(User user, Portfolio kisPortfolio) {
+        List<Portfolio> portfolios = portfolioRepository.findByUser(user);
+        if (portfolios == null || portfolios.isEmpty()) {
+            return;
+        }
+
+        Map<String, Holding> sourceHoldings = kisPortfolio.getHoldings().stream()
+                .filter(h -> h.getStock() != null && h.getStock().getStockCode() != null && h.getQuantity() != null && h.getQuantity() > 0)
+                .collect(Collectors.toMap(
+                        h -> h.getStock().getStockCode(),
+                        Function.identity(),
+                        (a, b) -> a
+                ));
+
+        for (Portfolio p : portfolios) {
+            if (p.getPortfolioId().equals(kisPortfolio.getPortfolioId())) {
+                continue; // 본인 제외
+            }
+
+            List<Holding> targetHoldings = p.getHoldings();
+            if (targetHoldings == null || targetHoldings.isEmpty()) {
+                continue; // 기존 보유가 없는 포트폴리오는 건너뜀
+            }
+
+            // KIS에 없거나, quantity<=0인 종목 제거 (전량 매도 반영)
+            targetHoldings.removeIf(h -> h.getStock() == null
+                    || h.getStock().getStockCode() == null
+                    || !sourceHoldings.containsKey(h.getStock().getStockCode())
+                    || (h.getQuantity() != null && h.getQuantity() <= 0));
+
+            // 존재하는 종목은 수량/평단 동기화
+            for (Holding tgt : targetHoldings) {
+                String code = tgt.getStock().getStockCode();
+                Holding src = sourceHoldings.get(code);
+                if (src != null) {
+                    tgt.setQuantity(src.getQuantity());
+                    tgt.setAvgPrice(src.getAvgPrice());
+                }
+            }
+
+            portfolioRepository.save(p);
+        }
     }
 
     /**

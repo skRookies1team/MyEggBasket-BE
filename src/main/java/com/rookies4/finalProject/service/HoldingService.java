@@ -76,15 +76,16 @@ public class HoldingService {
         List<Holding> holdings = holdingRepository.findByPortfolio(portfolio);
         
         // LAZY 로딩된 Stock 엔티티들을 트랜잭션 내에서 초기화하여 JSON 직렬화 시 오류 방지
-        holdings.forEach(holding -> {
-            if (holding.getStock() != null) {
-                // Stock의 기본 필드들을 접근하여 초기화
-                holding.getStock().getStockCode();
-                holding.getStock().getName();
-            }
-        });
-        
+        // 그리고 quantity > 0인 것만 반환
         return holdings.stream()
+                .filter(holding -> holding.getQuantity() != null && holding.getQuantity() > 0)
+                .peek(holding -> {
+                    if (holding.getStock() != null) {
+                        // Stock의 기본 필드들을 접근하여 초기화
+                        holding.getStock().getStockCode();
+                        holding.getStock().getName();
+                    }
+                })
                 .map(HoldingDTO.HoldingResponse::fromEntity)
                 .collect(Collectors.toList());
     }
