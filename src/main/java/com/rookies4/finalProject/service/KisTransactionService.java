@@ -8,6 +8,7 @@ import com.rookies4.finalProject.domain.entity.User;
 import com.rookies4.finalProject.dto.KisApiRequest;
 import com.rookies4.finalProject.dto.KisTransactionDTO;
 import java.time.LocalDate;
+import java.time.ZoneId; // [추가] TimeZone 지정을 위해 추가
 import java.time.format.DateTimeFormatter;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -25,8 +26,12 @@ public class KisTransactionService {
     private final SecureLogger secureLogger;
 
     public KisTransactionDTO getDailyOrderHistory(User user, String accessToken, boolean useVirtual) {
-        String threeMonthday = LocalDate.now().minusMonths(3).format(DateTimeFormatter.BASIC_ISO_DATE);
-        String today = LocalDate.now().format(DateTimeFormatter.BASIC_ISO_DATE);
+        // [수정] 서버 시스템 시간이 UTC여도 한국 시간(KST)을 기준으로 날짜를 가져오도록 강제 설정
+        LocalDate nowKst = LocalDate.now(ZoneId.of("Asia/Seoul"));
+
+        String threeMonthday = nowKst.minusMonths(3).format(DateTimeFormatter.BASIC_ISO_DATE);
+        String today = nowKst.format(DateTimeFormatter.BASIC_ISO_DATE);
+
         String cano = user.getAccount();
         String trId = useVirtual ? "VTTC0081R" : "TTTC0081R";
 
@@ -36,7 +41,7 @@ public class KisTransactionService {
                 .param("CANO", cano)
                 .param("ACNT_PRDT_CD", ACCOUNT_PRODUCT_CODE)
                 .param("INQR_STRT_DT", threeMonthday)
-                .param("INQR_END_DT", today)
+                .param("INQR_END_DT", today) // 한국 시간 기준 오늘 날짜로 설정
                 .param("SLL_BUY_DVSN_CD", "00")
                 .param("PDNO", "")
                 .param("ORD_GNO_BRNO", "00000")
@@ -51,12 +56,13 @@ public class KisTransactionService {
                 .useVirtualServer(useVirtual)
                 .build();
 
-        log.info("[KIS_ORDER] 주문내역 조회 요청: userId={}", user.getId());
+        log.info("[KIS_ORDER] 주문내역 조회 요청: userId={}, period={}~{}", user.getId(), threeMonthday, today);
 
         try {
             String bodyStr = kisApiClient.get(user.getId(), request, String.class);
-            
-            log.info("[KIS_ORDER] raw 응답: body={}", secureLogger.maskSensitive(bodyStr));
+
+            // 로그가 너무 길다면 필요한 경우 주석 처리하거나 secureLogger 사용
+            // log.info("[KIS_ORDER] raw 응답: body={}", secureLogger.maskSensitive(bodyStr));
 
             if (bodyStr == null || bodyStr.isBlank()) {
                 log.warn("[KIS_ORDER] 주문내역 조회 응답 body 가 비어있음, userId={}", user.getId());
