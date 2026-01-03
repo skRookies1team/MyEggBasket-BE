@@ -1,5 +1,6 @@
 package com.rookies4.finalProject.service.kafka;
 
+import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.rookies4.finalProject.domain.entity.PriceTarget;
 import com.rookies4.finalProject.dto.kafka.OrderBookDTO;
@@ -207,8 +208,9 @@ public class StockTickConsumer {
     }
 
     private List<OrderBookDTO.OrderItem> buildOrderItems (Map < String, Object > data, String key){
-        List<Map<String, Object>> rawItems =
-                (List<Map<String, Object>>) data.get(key);
+        List<Map<String, Object>> rawItems = objectMapper.convertValue(
+                data.get(key), new TypeReference<List<Map<String, Object>>>() {}
+        );
 
         if (rawItems == null) {
             return List.of();
