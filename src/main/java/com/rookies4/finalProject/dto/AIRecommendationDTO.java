@@ -27,7 +27,10 @@ public class AIRecommendationDTO {
     @JsonIgnoreProperties(ignoreUnknown = true)
     public static class RecommendationCreateRequest {
 
-        @NotNull(message = "portfolioId는 필수입니다.")
+        // [수정] userId 추가, portfolioId는 선택사항으로 변경 (둘 중 하나는 필수여야 함을 로직으로 처리)
+        private Long userId;
+
+        // @NotNull(message = "portfolioId는 필수입니다.") -> 제거 (userId로 대체 가능하므로)
         private Long portfolioId;
 
         @NotBlank(message = "종목코드는 필수입니다.")

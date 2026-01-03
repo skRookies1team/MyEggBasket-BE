@@ -145,4 +145,55 @@ public class AIRecommendationService {
             throw new BusinessException(ErrorCode.AUTH_ACCESS_DENIED, "해당 포트폴리오에 대한 접근 권한이 없습니다.");
         }
     }
+    public AIRecommendationDTO.RecommendationResponse createRecommendationByAI(AIRecommendationDTO.RecommendationCreateRequest request) {
+        Portfolio portfolio;
+
+        // 1. Portfolio 결정 로직 (userId 우선)
+        if (request.getUserId() != null) {
+            User user = userRepository.findById(request.getUserId())
+                    .orElseThrow(() -> new BusinessException(ErrorCode.USER_NOT_FOUND));
+
+            // 유저의 포트폴리오 목록 조회
+            List<Portfolio> portfolios = portfolioRepository.findByUser(user);
+
+            if (portfolios.isEmpty()) {
+                // 포트폴리오가 없으면 자동 생성
+                portfolio = Portfolio.builder()
+                        .user(user)
+                        .name("My AI Portfolio")
+                        .build();
+                portfolio = portfolioRepository.save(portfolio);
+                log.info("[AI Service] User {}의 새 포트폴리오 생성", request.getUserId());
+            } else {
+                // 기존 포트폴리오 사용 (첫 번째 것)
+                portfolio = portfolios.get(0);
+            }
+        } else if (request.getPortfolioId() != null) {
+            // userId가 없고 portfolioId만 있는 경우
+            portfolio = portfolioRepository.findById(request.getPortfolioId())
+                    .orElseThrow(() -> new BusinessException(ErrorCode.PORTFOLIO_NOT_FOUND));
+        } else {
+            throw new BusinessException(ErrorCode.INTERNAL_SERVER_ERROR, "userId 또는 portfolioId 중 하나는 필수입니다.");
+        }
+
+        // 2. 주식 종목 조회
+        Stock stock = stockRepository.findById(request.getStockCode())
+                .orElseThrow(() -> new BusinessException(ErrorCode.TICKER_NOT_FOUND));
+
+        // 3. 엔티티 생성 및 저장
+        AIRecommendation recommendation = AIRecommendation.builder()
+                .portfolio(portfolio)
+                .stock(stock)
+                .aiScore(request.getAiScore())
+                .actionType(request.getActionType())
+                .currentHolding(request.getCurrentHolding())
+                .targetHolding(request.getTargetHolding())
+                .targetHoldingPercentage(request.getTargetHoldingPercentage())
+                .adjustmentAmount(request.getAdjustmentAmount())
+                .reasonSummary(request.getReasonSummary())
+                .riskWarning(request.getRiskWarning())
+                .build();
+
+        return AIRecommendationDTO.RecommendationResponse.fromEntity(aiRecommendationRepository.save(recommendation));
+    }
 }

@@ -72,6 +72,7 @@ public class SecurityConfig {
                                 "/api/app/kis/trade/**",
                                 "/api/app/kis/rank/**",
                                 "/api/app/subscriptions/active-codes",
+                                "api/app/portfolios/**",
                                 "/api/test/**",
                                 "/ws/**", "/ws"
                         ).permitAll()

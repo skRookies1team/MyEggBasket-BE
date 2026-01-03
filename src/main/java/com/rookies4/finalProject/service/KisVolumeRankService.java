@@ -13,7 +13,10 @@ import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 
 import java.math.BigDecimal;
+import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.stream.Collectors;
 
 @Service
@@ -21,18 +24,25 @@ import java.util.stream.Collectors;
 public class KisVolumeRankService {
 
     private static final Logger log = LoggerFactory.getLogger(KisVolumeRankService.class);
-
     private final KisApiClient kisApiClient;
 
-    /**
-     * 거래량 순위 TOP 10 조회 후 프론트엔드용 DTO로 변환하여 반환
-     * @param user 사용자 정보
-     * @return 거래량 순위 DTO 리스트
-     */
-    public List<VolumeRankResponseDTO> getVolumeRank(User user) {
-        log.info("[KIS] 거래량 순위 조회 시작 - UserId: {}", user.getId());
+    // [캐시 추가] 메모리에 결과 저장 (키: "RANK", 값: 데이터+만료시간)
+    private final Map<String, CachedRank> cache = new ConcurrentHashMap<>();
 
-        // KisApiClient를 사용한 간결한 API 호출
+    private record CachedRank(List<VolumeRankResponseDTO> data, LocalDateTime expireAt) {
+    }
+
+    public List<VolumeRankResponseDTO> getVolumeRank(User user) {
+        // 1. 캐시 확인 (유효기간 1분)
+        if (cache.containsKey("RANK")) {
+            CachedRank cached = cache.get("RANK");
+            if (LocalDateTime.now().isBefore(cached.expireAt())) {
+                return cached.data(); // API 호출 없이 바로 반환
+            }
+        }
+
+        log.info("[KIS] 거래량 순위 조회 시작 (API 호출) - UserId: {}", user.getId());
+
         KisApiRequest request = KisApiRequest.builder()
                 .path("/uapi/domestic-stock/v1/quotations/volume-rank")
                 .trId("FHPST01710000")
@@ -51,38 +61,30 @@ public class KisVolumeRankService {
                 .build();
 
         KisVolumeRankDTO.KisVolumeRankResponse body =
-            kisApiClient.get(user.getId(), request, KisVolumeRankDTO.KisVolumeRankResponse.class);
+                kisApiClient.get(user.getId(), request, KisVolumeRankDTO.KisVolumeRankResponse.class);
 
         if (body == null || body.getOutput() == null) {
-            throw new BusinessException(
-                ErrorCode.KIS_API_ERROR,
-                "거래량 순위 조회 응답이 비어있습니다."
-            );
+            throw new BusinessException(ErrorCode.KIS_API_ERROR, "거래량 순위 조회 응답이 비어있습니다.");
         }
 
-        // 성공 여부 확인
         if (!"0".equals(body.getRtCd())) {
             log.error("KIS 거래량 순위 조회 실패: rt_cd={}, msg={}", body.getRtCd(), body.getMsg1());
-            throw new BusinessException(
-                ErrorCode.KIS_API_ERROR,
-                "거래량 순위 조회 실패: " + body.getMsg1()
-            );
+            throw new BusinessException(ErrorCode.KIS_API_ERROR, "거래량 순위 조회 실패: " + body.getMsg1());
         }
 
-        // TOP 10만 추출하여 프론트엔드용 DTO로 변환
         List<VolumeRankResponseDTO> result = body.getOutput().stream()
                 .limit(10)
                 .map(this::transformToResponseDTO)
                 .collect(Collectors.toList());
 
-        log.info("[KIS] 거래량 순위 조회 성공 - UserId: {}, Count: {}", user.getId(), result.size());
+        // 2. 결과 캐싱 (1분간 유효)
+        cache.put("RANK", new CachedRank(result, LocalDateTime.now().plusMinutes(1)));
+
+        log.info("[KIS] 거래량 순위 조회 성공 및 캐싱 완료");
 
         return result;
     }
 
-    /**
-     * KIS API 원본 아이템을 프론트엔드 DTO로 변환하는 헬퍼 메소드
-     */
     private VolumeRankResponseDTO transformToResponseDTO(KisVolumeRankDTO.VolumeRankItem item) {
         return VolumeRankResponseDTO.builder()
                 .rank(Integer.parseInt(item.getRank()))
