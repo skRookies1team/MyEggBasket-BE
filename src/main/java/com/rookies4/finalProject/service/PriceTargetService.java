@@ -35,7 +35,11 @@ public class PriceTargetService {
     private final UserRepository userRepository;
     private final PriceAlertEventProducer priceAlertEventProducer;
 
-    // 상한가 설정 (1개만 허용, 기존 것 있으면 덮어쓰기)
+    /**
+     * 상한가 설정 (1개만 허용, 기존 것 있으면 덮어쓰기)
+     * 1. 비즈니스 로직: 상한가는 설정된 하한가보다 반드시 커야 함을 검증합니다.
+     * 2. Kafka 연동: 설정 완료 후 실시간 알림을 위해 이벤트를 발행합니다.
+     */
     public PriceTargetDTO.PriceTargetResponse setUpperTarget(PriceTargetDTO.SetTargetRequest request) {
         User user = getCurrentUser();
         Stock stock = getStock(request.getStockCode());
@@ -68,14 +72,18 @@ public class PriceTargetService {
 
         PriceTarget saved = priceTargetRepository.save(priceTarget);
 
-        // Kafka 이벤트 발행
+        // Kafka 이벤트 발행: 목표가 설정 시 실시간 알림을 위해 Producer 호출
         publishPriceAlertEvent(user.getId(), stock.getStockCode(), stock.getName(),
                 request.getTargetPrice(), PriceAlertEventDTO.AlertType.UPPER);
 
         return PriceTargetDTO.PriceTargetResponse.fromEntity(saved);
     }
 
-    // 하한가 설정 (1개만 허용, 기존 것 있으면 덮어쓰기)
+    /**
+     * 하한가 설정 (1개만 허용, 기존 것 있으면 덮어쓰기)
+     * 1. 비즈니스 로직: 하한가는 설정된 상한가보다 반드시 작아야 함을 검증합니다.
+     * 2. Kafka 연동: 설정 완료 후 실시간 알림을 위해 이벤트를 발행합니다.
+     */
     public PriceTargetDTO.PriceTargetResponse setLowerTarget(PriceTargetDTO.SetTargetRequest request) {
         User user = getCurrentUser();
         Stock stock = getStock(request.getStockCode());
@@ -108,7 +116,7 @@ public class PriceTargetService {
 
         PriceTarget saved = priceTargetRepository.save(priceTarget);
 
-        // Kafka 이벤트 발행
+        // Kafka 이벤트 발행: 목표가 설정 시 실시간 알림을 위해 Producer 호출
         publishPriceAlertEvent(user.getId(), stock.getStockCode(), stock.getName(),
                 request.getTargetPrice(), PriceAlertEventDTO.AlertType.LOWER);
 
@@ -131,15 +139,6 @@ public class PriceTargetService {
 
         BigDecimal clearedTarget = priceTarget.getUpperTarget();
         priceTarget.setUpperTarget(null);
-
-        // 상한가와 하한가 모두 없으면 레코드 삭제
-        if (priceTarget.getLowerTarget() == null) {
-            priceTargetRepository.delete(priceTarget);
-            log.info("Price target deleted (both targets removed) - UserId: {}, StockCode: {}",
-                    user.getId(), stockCode);
-        } else {
-            priceTargetRepository.save(priceTarget);
-        }
 
         // Kafka 이벤트 발행 (취소 알림)
         publishPriceAlertCancelEvent(user.getId(), stock.getStockCode(), stock.getName(),

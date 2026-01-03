@@ -124,7 +124,11 @@ public class TransactionSyncService {
 
         // 체결 시각
         LocalDateTime executedAt = parseKisDateTime(kisOrder.getOrderDate(), kisOrder.getOrderTime());
-        transaction.setExecutedAt(executedAt);
+        if (executedAt != null) {
+            transaction.setExecutedAt(executedAt);
+        } else if (transaction.getExecutedAt() == null) {
+            transaction.setExecutedAt(LocalDateTime.now());
+        }
 
         // 상태 결정
         TransactionStatus status = decideStatus(orderQty, filledQty, cancelQty);

@@ -2,6 +2,7 @@ package com.rookies4.finalProject.service;
 
 import com.rookies4.finalProject.domain.entity.Portfolio;
 import com.rookies4.finalProject.domain.entity.User;
+import com.rookies4.finalProject.domain.enums.TransactionStatus;
 import com.rookies4.finalProject.dto.PortfolioDTO;
 import com.rookies4.finalProject.exception.BusinessException;
 import com.rookies4.finalProject.exception.ErrorCode;
@@ -28,6 +29,10 @@ public class PortfolioService {
     private final TransactionRepository transactionRepository;
 
     //1. Portfolio 생성
+    /**
+     * 포트폴리오 생성
+     * 포트폴리오 생성 시, 사용자가 선택한 종목들의 과거 거래 내역을 자동으로 찾아 연결
+     */
     public PortfolioDTO.PortfolioResponse createPortfolio(PortfolioDTO.PortfolioRequest request){
         Long currentUserId = SecurityUtil.getCurrentUserId();
         if (currentUserId == null) {
@@ -75,7 +80,8 @@ public class PortfolioService {
                     // 현재 보유 중인 종목만 거래 내역 추가
                     if (hasValidHolding) {
                         List<com.rookies4.finalProject.domain.entity.Transaction> transactions =
-                                transactionRepository.findByUser_IdAndStock_StockCodeOrderByExecutedAtDesc(user.getId(), stockCode);
+                            transactionRepository.findByUser_IdAndStock_StockCodeAndStatusOrderByExecutedAtDesc(
+                                user.getId(), stockCode, TransactionStatus.COMPLETED);
                         for (com.rookies4.finalProject.domain.entity.Transaction tx : transactions) {
                             if (tx.getPortfolios() == null) {
                                 tx.setPortfolios(new java.util.ArrayList<>());
@@ -221,6 +227,10 @@ public class PortfolioService {
     }
 
     //7. 포트폴리오에 종목 추가 (기존 거래 재할당)
+    /**
+     * 포트폴리오에 종목 추가
+     * 종목 추가 시, 해당 종목의 과거 거래 내역을 찾아 포트폴리오에 연결합니다.
+     */
     public void addStocksToPortfolio(Long portfolioId, List<String> stockCodes) {
         Portfolio portfolio = portfolioRepository.findById(portfolioId)
                 .orElseThrow(() -> new BusinessException(ErrorCode.PORTFOLIO_NOT_FOUND));
@@ -236,7 +246,8 @@ public class PortfolioService {
         for (String stockCode : stockCodes) {
             if (stockCode != null && !stockCode.isBlank()) {
                 List<com.rookies4.finalProject.domain.entity.Transaction> transactions =
-                        transactionRepository.findByUser_IdAndStock_StockCodeOrderByExecutedAtDesc(user.getId(), stockCode);
+                    transactionRepository.findByUser_IdAndStock_StockCodeAndStatusOrderByExecutedAtDesc(
+                        user.getId(), stockCode, TransactionStatus.COMPLETED);
                 for (com.rookies4.finalProject.domain.entity.Transaction tx : transactions) {
                     if (tx.getPortfolios() == null) {
                         tx.setPortfolios(new java.util.ArrayList<>());
@@ -270,7 +281,8 @@ public class PortfolioService {
         for (String stockCode : stockCodes) {
             if (stockCode != null && !stockCode.isBlank()) {
                 List<com.rookies4.finalProject.domain.entity.Transaction> transactions =
-                        transactionRepository.findByUser_IdAndStock_StockCodeOrderByExecutedAtDesc(user.getId(), stockCode);
+                    transactionRepository.findByUser_IdAndStock_StockCodeAndStatusOrderByExecutedAtDesc(
+                        user.getId(), stockCode, TransactionStatus.COMPLETED);
                 for (com.rookies4.finalProject.domain.entity.Transaction tx : transactions) {
                     if (tx.getPortfolios() != null && tx.getPortfolios().contains(portfolio)) {
                         tx.getPortfolios().remove(portfolio);
