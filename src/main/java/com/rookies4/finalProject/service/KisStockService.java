@@ -14,6 +14,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 
 @Slf4j
 @Service
@@ -24,22 +25,43 @@ public class KisStockService {
     private final KisApiClient kisApiClient;
     private final StockRepository stockRepository;
 
+    // 마지막 성공 가격을 저장할 메모리 캐시 (Key: 종목코드)
+    private final Map<String, CurrentPriceDTO> lastKnownPrices = new ConcurrentHashMap<>();
+
     public CurrentPriceDTO getCurrentPrice(String stockCode, boolean useVirtualServer, Long userId) {
         validateStockCodeFormat(stockCode);
-        
-        // KisApiClient를 사용한 간결한 API 호출
-        KisApiRequest request = KisApiRequest.builder()
-                .path("/uapi/domestic-stock/v1/quotations/inquire-price")
-                .trId("FHKST01010100")
-                .param("FID_COND_MRKT_DIV_CODE", "J")
-                .param("FID_INPUT_ISCD", stockCode)
-                .useVirtualServer(useVirtualServer)
-                .build();
-        
-        @SuppressWarnings("unchecked")
-        Map<String, Object> response = kisApiClient.get(userId, request, Map.class);
-        
-        return mapToCurrentPrice(response, stockCode);
+
+        try {
+            // KisApiClient를 사용한 API 호출
+            KisApiRequest request = KisApiRequest.builder()
+                    .path("/uapi/domestic-stock/v1/quotations/inquire-price")
+                    .trId("FHKST01010100")
+                    .param("FID_COND_MRKT_DIV_CODE", "J")
+                    .param("FID_INPUT_ISCD", stockCode)
+                    .useVirtualServer(useVirtualServer)
+                    .build();
+
+            @SuppressWarnings("unchecked")
+            Map<String, Object> response = kisApiClient.get(userId, request, Map.class);
+
+            CurrentPriceDTO result = mapToCurrentPrice(response, stockCode);
+
+            // [성공 시] 캐시에 최신 데이터 저장
+            lastKnownPrices.put(stockCode, result);
+
+            return result;
+
+        } catch (Exception e) {
+            // [실패 시] 캐시 확인 및 폴백 처리
+            if (lastKnownPrices.containsKey(stockCode)) {
+                log.warn("[Fallback] '{}' API 조회 실패 -> 캐시된 과거 데이터 반환. (Error: {})", stockCode, e.getMessage());
+                return lastKnownPrices.get(stockCode);
+            }
+
+            // 캐시 데이터도 없으면 에러 로깅 후 throw
+            log.error("[Error] '{}' API 조회 실패 & 캐시 데이터 없음. Error: {}", stockCode, e.getMessage());
+            throw e;
+        }
     }
 
     /**
@@ -77,7 +99,7 @@ public class KisStockService {
                 .closePrice(currentPrice.doubleValue())
                 .updatedAt(java.time.LocalDateTime.now())
                 .build();
-        
+
         log.info("[KIS] 현재가 조회 성공 - StockCode: {}, StockName: {}, Price: {}", stockCode, stockName, currentPrice);
         return result;
     }
