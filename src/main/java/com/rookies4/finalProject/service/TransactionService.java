@@ -50,60 +50,53 @@ public class TransactionService {
     public List<TransactionDTO.Response> getUserOrders(Long userId, String status, boolean useVirtualServer, Long portfolioId) {
 
         User user = userRepository.findById(userId)
-                .orElseThrow(() -> new BusinessException(ErrorCode.USER_NOT_FOUND, "해당 ID의 사용자를 찾을 수 없습니다."));
+                .orElseThrow(() -> new BusinessException(
+                        ErrorCode.USER_NOT_FOUND,
+                        "해당 ID의 사용자를 찾을 수 없습니다.")
+                );
 
-        List<String> targetStockCodes = null;
-
-        // 1. 포트폴리오 ID가 있을 경우, 해당 포트폴리오의 보유 종목 코드들을 추출
+        Portfolio portfolio = null;
         if (portfolioId != null) {
-            Portfolio portfolio = portfolioRepository.findById(portfolioId)
+            portfolio = portfolioRepository.findById(portfolioId)
                     .orElseThrow(() -> new BusinessException(ErrorCode.PORTFOLIO_NOT_FOUND));
 
             if (!portfolio.getUser().getId().equals(userId)) {
-                throw new BusinessException(ErrorCode.AUTH_ACCESS_DENIED, "해당 포트폴리오에 대한 접근 권한이 없습니다.");
-            }
-
-            // 포트폴리오 엔티티 내에 종목 관계
-            targetStockCodes = portfolio.getHoldings().stream()
-                    .map(ps -> ps.getStock().getStockCode())
-                    .toList();
-
-            // 만약 포트폴리오에 종목이 하나도 없다면, 거래 내역이 나올 수 없으므로 빈 리스트 반환
-            if (targetStockCodes.isEmpty()) {
-                return List.of();
+                throw new BusinessException(
+                        ErrorCode.AUTH_ACCESS_DENIED,
+                        "해당 포트폴리오에 대한 접근 권한이 없습니다.");
             }
         }
 
-        // 2. KIS API 동기화 (기존 로직 유지)
+        // 2. KIS API 동기화 (주문 내역 조회 시마다 갱신)
         try {
             transactionSyncService.syncUserOrdersFromKis(user, useVirtualServer);
         } catch (Exception e) {
-            log.warn("KIS 주문 내역 동기화 실패, userId={}, msg={}", userId, e.getMessage());
+            log.warn("KIS 주문 내역 동기화 실패, DB 데이터만 사용. userId={}, msg={}",
+                    userId, e.getMessage());
         }
 
-        // 3. 필터링 조건 설정 (Status)
-        TransactionStatus statusFilter = (status != null && !status.isBlank()) ? parseStatus(status) : null;
+        // 3. DB 조회 (동기화 끝난 최신 데이터 조회)
+        TransactionStatus statusFilter = null;
+        if (status != null && !status.isBlank()) {
+            statusFilter = parseStatus(status);
+        }
 
-        // 4. DB 조회 (targetStockCodes 유무에 따른 분기)
         List<Transaction> transactions;
-        if (targetStockCodes != null) {
-            // 포트폴리오 내 종목 코드와 일치하는 거래 내역만 조회
-            if (statusFilter != null) {
-                transactions = transactionRepository.findByUser_IdAndStock_StockCodeInAndStatusOrderByExecutedAtDesc(
-                        userId, targetStockCodes, statusFilter);
-            } else {
-                transactions = transactionRepository.findByUser_IdAndStock_StockCodeInOrderByExecutedAtDesc(
-                        userId, targetStockCodes);
-            }
+        if (portfolio != null && statusFilter != null) {
+            transactions = transactionRepository
+                    .findByUser_IdAndPortfolios_PortfolioIdAndStatusOrderByExecutedAtDesc(userId, portfolioId, statusFilter);
+        } else if (portfolio != null) {
+            transactions = transactionRepository
+                    .findByUser_IdAndPortfolios_PortfolioIdOrderByExecutedAtDesc(userId, portfolioId);
+        } else if (statusFilter != null) {
+            transactions = transactionRepository
+                    .findByUser_IdAndStatusOrderByExecutedAtDesc(userId, statusFilter);
         } else {
-            // 포트폴리오 지정이 없으면 기존처럼 전체 조회
-            if (statusFilter != null) {
-                transactions = transactionRepository.findByUser_IdAndStatusOrderByExecutedAtDesc(userId, statusFilter);
-            } else {
-                transactions = transactionRepository.findByUser_IdOrderByExecutedAtDesc(userId);
-            }
+            transactions = transactionRepository
+                    .findByUser_IdOrderByExecutedAtDesc(userId);
         }
 
+        // 4. DTO 변환
         return transactions.stream()
                 .map(TransactionDTO.Response::fromEntity)
                 .toList();
