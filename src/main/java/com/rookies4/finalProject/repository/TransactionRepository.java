@@ -30,4 +30,12 @@ public interface TransactionRepository extends JpaRepository<Transaction, Long> 
 
     // 4-1. 사용자 ID + 종목 코드 + 상태로 조회 (포트폴리오 할당용)
     List<Transaction> findByUser_IdAndStock_StockCodeAndStatusOrderByExecutedAtDesc(Long userId, String stockCode, TransactionStatus status);
+
+    // 종목 코드 리스트에 포함된 거래 내역 조회 (상태 필터링 포함)
+    List<Transaction> findByUser_IdAndStock_StockCodeInAndStatusOrderByExecutedAtDesc(
+            Long userId, List<String> stockCodes, TransactionStatus status);
+
+    // 종목 코드 리스트에 포함된 모든 거래 내역 조회
+    List<Transaction> findByUser_IdAndStock_StockCodeInOrderByExecutedAtDesc(
+            Long userId, List<String> stockCodes);
 }
