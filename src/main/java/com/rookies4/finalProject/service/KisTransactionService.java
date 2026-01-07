@@ -8,8 +8,10 @@ import com.rookies4.finalProject.domain.entity.User;
 import com.rookies4.finalProject.dto.KisApiRequest;
 import com.rookies4.finalProject.dto.KisTransactionDTO;
 import java.time.LocalDate;
-import java.time.ZoneId; // [추가] TimeZone 지정을 위해 추가
+import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
+import java.util.ArrayList;
+import java.util.List;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -26,63 +28,103 @@ public class KisTransactionService {
     private final SecureLogger secureLogger;
 
     public KisTransactionDTO getDailyOrderHistory(User user, String accessToken, boolean useVirtual) {
-        // [수정] 서버 시스템 시간이 UTC여도 한국 시간(KST)을 기준으로 날짜를 가져오도록 강제 설정
         LocalDate nowKst = LocalDate.now(ZoneId.of("Asia/Seoul"));
-
         String threeMonthday = nowKst.minusMonths(3).format(DateTimeFormatter.BASIC_ISO_DATE);
         String today = nowKst.format(DateTimeFormatter.BASIC_ISO_DATE);
 
         String cano = user.getAccount();
         String trId = useVirtual ? "VTTC0081R" : "TTTC0081R";
 
-        KisApiRequest request = KisApiRequest.builder()
-                .path("/uapi/domestic-stock/v1/trading/inquire-daily-ccld")
-                .trId(trId)
-                .param("CANO", cano)
-                .param("ACNT_PRDT_CD", ACCOUNT_PRODUCT_CODE)
-                .param("INQR_STRT_DT", threeMonthday)
-                .param("INQR_END_DT", today) // 한국 시간 기준 오늘 날짜로 설정
-                .param("SLL_BUY_DVSN_CD", "00")
-                .param("PDNO", "")
-                .param("ORD_GNO_BRNO", "00000")
-                .param("ODNO", "")
-                .param("CCLD_DVSN", "00")
-                .param("INQR_DVSN", "00")
-                .param("INQR_DVSN_1", "")
-                .param("INQR_DVSN_3", "00")
-                .param("EXCG_ID_DVSN_CD", "KRX")
-                .param("CTX_AREA_FK100", "")
-                .param("CTX_AREA_NK100", "")
-                .useVirtualServer(useVirtual)
-                .build();
+        // [수정] 타입 변경: Output1 -> KisOrderDetail
+        List<KisTransactionDTO.KisOrderDetail> allHistory = new ArrayList<>();
 
-        log.info("[KIS_ORDER] 주문내역 조회 요청: userId={}, period={}~{}", user.getId(), threeMonthday, today);
+        KisTransactionDTO lastResponseDto = new KisTransactionDTO();
 
-        try {
-            String bodyStr = kisApiClient.get(user.getId(), request, String.class);
+        String ctxAreaFk = "";
+        String ctxAreaNk = "";
+        boolean hasNext = true;
+        int pageCount = 0;
 
-            // 로그가 너무 길다면 필요한 경우 주석 처리하거나 secureLogger 사용
-            // log.info("[KIS_ORDER] raw 응답: body={}", secureLogger.maskSensitive(bodyStr));
+        log.info("[KIS_ORDER] 주문내역 전체 조회 시작: userId={}, period={}~{}", user.getId(), threeMonthday, today);
 
-            if (bodyStr == null || bodyStr.isBlank()) {
-                log.warn("[KIS_ORDER] 주문내역 조회 응답 body 가 비어있음, userId={}", user.getId());
-                return new KisTransactionDTO();
+        while (hasNext) {
+            pageCount++;
+            if (pageCount > 100) {
+                log.warn("[KIS_ORDER] 페이지네이션 횟수 초과로 중단합니다. userId={}", user.getId());
+                break;
             }
 
-            objectMapper.configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false);
-            KisTransactionDTO dto = objectMapper.readValue(bodyStr, KisTransactionDTO.class);
+            KisApiRequest request = KisApiRequest.builder()
+                    .path("/uapi/domestic-stock/v1/trading/inquire-daily-ccld")
+                    .trId(trId)
+                    .param("CANO", cano)
+                    .param("ACNT_PRDT_CD", ACCOUNT_PRODUCT_CODE)
+                    .param("INQR_STRT_DT", threeMonthday)
+                    .param("INQR_END_DT", today)
+                    .param("SLL_BUY_DVSN_CD", "00")
+                    .param("PDNO", "")
+                    .param("ORD_GNO_BRNO", "00000")
+                    .param("ODNO", "")
+                    .param("CCLD_DVSN", "00")
+                    .param("INQR_DVSN", "00")
+                    .param("INQR_DVSN_1", "")
+                    .param("INQR_DVSN_3", "00")
+                    .param("EXCG_ID_DVSN_CD", "KRX")
+                    .param("CTX_AREA_FK100", ctxAreaFk)
+                    .param("CTX_AREA_NK100", ctxAreaNk)
+                    .useVirtualServer(useVirtual)
+                    .build();
 
-            log.info("[KIS_ORDER] 파싱 결과: rt_cd={}, msg_cd={}, msg1={}, output1.size={}",
-                    dto.getRtCd(),
-                    dto.getMsgCd(),
-                    dto.getMsg1(),
-                    dto.getOutput1() == null ? null : dto.getOutput1().size());
+            try {
+                String bodyStr = kisApiClient.get(user.getId(), request, String.class);
 
-            return dto;
+                if (bodyStr == null || bodyStr.isBlank()) {
+                    log.warn("[KIS_ORDER] 주문내역 조회 응답 body가 비어있음 (Page: {}), userId={}", pageCount, user.getId());
+                    break;
+                }
 
-        } catch (Exception e) {
-            log.error("[KIS_ORDER] 주문내역 조회 또는 파싱 실패: {}, userId={}", e.getMessage(), user.getId(), e);
-            return new KisTransactionDTO();
+                objectMapper.configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false);
+                KisTransactionDTO dto = objectMapper.readValue(bodyStr, KisTransactionDTO.class);
+
+                lastResponseDto = dto;
+
+                if (!"0".equals(dto.getRtCd())) {
+                    log.error("[KIS_ORDER] 조회 실패: rt_cd={}, msg={}", dto.getRtCd(), dto.getMsg1());
+                    break;
+                }
+
+                if (dto.getOutput1() != null) {
+                    allHistory.addAll(dto.getOutput1());
+                }
+
+                log.info("[KIS_ORDER] {} 페이지 조회 완료. 건수: {}, 누적 건수: {}",
+                        pageCount,
+                        (dto.getOutput1() != null ? dto.getOutput1().size() : 0),
+                        allHistory.size());
+
+                // [수정] DTO에 추가한 필드 사용
+                String nextNk = dto.getCtxAreaNk100();
+                String nextFk = dto.getCtxAreaFk100();
+
+                if (nextNk != null && !nextNk.trim().isEmpty()) {
+                    ctxAreaNk = nextNk;
+                    ctxAreaFk = nextFk;
+                } else {
+                    hasNext = false;
+                }
+
+            } catch (Exception e) {
+                log.error("[KIS_ORDER] 주문내역 조회 또는 파싱 실패 (Page: {}): {}, userId={}", pageCount, e.getMessage(), user.getId(), e);
+                hasNext = false;
+            }
         }
+
+        if (lastResponseDto != null) {
+            lastResponseDto.setOutput1(allHistory);
+            log.info("[KIS_ORDER] 전체 조회 완료. 총 {} 건 반환.", allHistory.size());
+            return lastResponseDto;
+        }
+
+        return new KisTransactionDTO();
     }
 }

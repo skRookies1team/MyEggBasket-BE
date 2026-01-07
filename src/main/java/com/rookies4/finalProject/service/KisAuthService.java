@@ -48,7 +48,6 @@ public class KisAuthService {
     /**
      * REST API용 accessToken
      */
-    @Transactional(propagation = Propagation.REQUIRES_NEW)
     public KisAuthTokenDTO.KisTokenResponse issueToken(boolean useVirtualServer, User user) {
         // 1. 메모리 캐시 확인 (DB 부하 방지)
         if (tokenCache.containsKey(user.getId())) {
@@ -93,7 +92,6 @@ public class KisAuthService {
     /**
      * WebSocket용 approval_key (항상 신규 발급)
      */
-    @Transactional(propagation = Propagation.REQUIRES_NEW)
     public String issueApprovalKey(boolean useVirtualServer, User user) {
         log.info("[KIS Auth] 웹소켓 접속키 신규 발급 - userId: {}", user.getId());
         return reissueApprovalKey(useVirtualServer, user);
@@ -102,7 +100,6 @@ public class KisAuthService {
     /**
      * WebSocket approval_key 강제 재발급
      */
-    @Transactional(propagation = Propagation.REQUIRES_NEW)
     public String reissueApprovalKey(boolean useVirtualServer, User user) {
         KisAuthToken token = kisAuthRepository.findByUser(user)
                 .orElseThrow(() ->
@@ -122,7 +119,6 @@ public class KisAuthService {
     /**
      * 토큰 강제 만료
      */
-    @Transactional(propagation = Propagation.REQUIRES_NEW)
     public void expireToken(User user) {
         // 메모리 캐시 즉시 제거
         tokenCache.remove(user.getId());
