@@ -44,7 +44,7 @@ public class KisPeriodStockService {
 
         // 반복 조회 로직 (Pagination)
         // KIS API는 한 번에 100건만 주므로, 과거 데이터가 더 있으면 end date를 옮겨서 다시 요청
-        int maxCalls = 20; // 무한 루프 방지용 (최대 20번 호출 -> 약 2000일, 4~5년치 데이터)
+        int maxCalls = 10; // 무한 루프 방지용 (최대 20번 호출 -> 약 2000일, 4~5년치 데이터)
         int callCount = 0;
 
         while (callCount < maxCalls) {

@@ -19,7 +19,6 @@ import java.util.concurrent.ConcurrentHashMap;
 @Slf4j
 @Service
 @RequiredArgsConstructor
-@Transactional(readOnly = true)
 public class KisStockService {
 
     private final KisApiClient kisApiClient;
