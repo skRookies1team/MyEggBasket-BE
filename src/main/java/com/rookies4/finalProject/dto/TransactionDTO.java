@@ -48,7 +48,7 @@ public class TransactionDTO {
                     .stockName(transaction.getStock() != null ? transaction.getStock().getName() : null)
 
                     .type(transaction.getType())
-                    .typeDescription(transaction.getType().getDescription())
+                    .typeDescription(transaction.getType() != null ? transaction.getType().getDescription() : null)
 
                     .status(transaction.getStatus())
                     .statusDescription(transaction.getStatus() != null ? transaction.getStatus().getDescription() : null)

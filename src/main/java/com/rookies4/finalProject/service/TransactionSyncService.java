@@ -38,6 +38,7 @@ public class TransactionSyncService {
      * - 2) 일간 주문 내역 조회
      * - 3) DB(Transaction Entity) upsert
      */
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
     public void syncUserOrdersFromKis(User user, boolean useVirtualServer) {
 
         KisAuthTokenDTO.KisTokenResponse tokenResponse =
