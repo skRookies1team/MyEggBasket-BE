@@ -21,6 +21,13 @@ public class KisTransactionDTO {
     @JsonProperty("msg1")
     private String msg1;
 
+    /** [필수 추가] 연속 조회를 위한 키 값 (다음 페이지 존재 여부 확인용) */
+    @JsonProperty("ctx_area_fk100")
+    private String ctxAreaFk100;
+
+    @JsonProperty("ctx_area_nk100")
+    private String ctxAreaNk100;
+
     /** 주문/체결 상세 목록 (output1) */
     @JsonProperty("output1")
     private List<KisOrderDetail> output1;
@@ -31,7 +38,7 @@ public class KisTransactionDTO {
 
     @Data
     @JsonIgnoreProperties(ignoreUnknown = true)
-    public static class KisOrderDetail {
+    public static class KisOrderDetail { // [주의] 클래스명이 Output1이 아니라 KisOrderDetail임
 
         /** 주문번호 (odno) */
         @JsonProperty("odno")
@@ -73,19 +80,19 @@ public class KisTransactionDTO {
         private String orderTime;
 
         @JsonProperty("cncl_yn")
-        private String cancelYn;  // 취소여부 (Y/N)
+        private String cancelYn;
 
         @JsonProperty("tot_ccld_amt")
-        private String totalFilledAmount; // 총체결금액
+        private String totalFilledAmount;
 
         @JsonProperty("rmn_qty")
-        private String remainQty; // 잔여수량
+        private String remainQty;
 
         @JsonProperty("rjct_qty")
-        private String rejectQty; // 거부수량
+        private String rejectQty;
 
         @JsonProperty("excg_dvsn_cd")
-        private String exchangeDivisionCode; // 거래소구분코드
+        private String exchangeDivisionCode;
 
         @JsonProperty("excg_id_dvsn_Cd")
         private String exchangeIdDivisionCode;
@@ -94,7 +101,6 @@ public class KisTransactionDTO {
     @Data
     @JsonIgnoreProperties(ignoreUnknown = true)
     public static class OutputSummary {
-
         @JsonProperty("tot_ord_qty")
         private String totalOrderQty;
 

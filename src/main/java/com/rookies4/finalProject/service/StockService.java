@@ -6,12 +6,14 @@ import com.rookies4.finalProject.exception.BusinessException;
 import com.rookies4.finalProject.exception.ErrorCode;
 import com.rookies4.finalProject.repository.StockRepository;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
 import java.util.stream.Collectors;
 
+@Slf4j
 @Service
 @RequiredArgsConstructor
 @Transactional
@@ -40,15 +42,20 @@ public class StockService {
     public StockDTO.StockResponse readStock(String stockCode){
         Stock stock = stockRepository.findByStockCode(stockCode)
                 .orElseThrow(() -> new BusinessException(ErrorCode.TICKER_NOT_FOUND));
+        
+        log.info("[Stock] 종목 정보 조회 성공 - StockCode: {}, StockName: {}", stockCode, stock.getName());
         return StockDTO.StockResponse.fromEntity(stock);
     }
 
     @Transactional(readOnly = true)
     public List<StockDTO.StockResponse> searchStocks(String keyword) {
-        return stockRepository.findByNameContainingIgnoreCaseOrStockCodeContaining(keyword, keyword)
+        List<StockDTO.StockResponse> results = stockRepository.findByNameContainingIgnoreCaseOrStockCodeContaining(keyword, keyword)
                 .stream()
                 .map(StockDTO.StockResponse::fromEntity)
                 .collect(Collectors.toList());
+        
+        log.info("[Stock] 종목 검색 성공 - Keyword: {}, Count: {}", keyword, results.size());
+        return results;
     }
 
 }

@@ -1,12 +1,10 @@
 package com.rookies4.finalProject.controller;
 
-import com.rookies4.finalProject.dto.TransactionDTO;
 import com.rookies4.finalProject.dto.UserDTO;
 import com.rookies4.finalProject.security.SecurityUtil;
 import com.rookies4.finalProject.service.TransactionService;
 import com.rookies4.finalProject.service.UserService;
 import jakarta.validation.Valid;
-import java.util.List;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;

@@ -23,6 +23,7 @@ import org.springframework.web.client.RestTemplate;
 
 import java.time.LocalDateTime;
 import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 
 @Slf4j
 @Service
@@ -33,53 +34,78 @@ public class KisAuthService {
     private final KisAuthRepository kisAuthRepository;
     private final EncryptionUtil encryptionUtil;
 
+    // 인메모리 토큰 캐시 (Key: UserId, Value: TokenInfo)
+    // DB 조회 부하를 줄이기 위해 사용
+    private final Map<Long, CachedTokenInfo> tokenCache = new ConcurrentHashMap<>();
+
+    private record CachedTokenInfo(KisAuthTokenDTO.KisTokenResponse response, LocalDateTime expirationTime) {
+        boolean isValid() {
+            // 만료 5분 전까지를 유효한 것으로 간주
+            return LocalDateTime.now().plusMinutes(5).isBefore(expirationTime);
+        }
+    }
+
     /**
      * REST API용 accessToken
-     * - 만료 전이면 재사용
-     * - 만료 시 재발급
      */
-    @Transactional(propagation = Propagation.REQUIRES_NEW)
     public KisAuthTokenDTO.KisTokenResponse issueToken(boolean useVirtualServer, User user) {
+        // 1. 메모리 캐시 확인 (DB 부하 방지)
+        if (tokenCache.containsKey(user.getId())) {
+            CachedTokenInfo cached = tokenCache.get(user.getId());
+            if (cached.isValid()) {
+                if (log.isDebugEnabled()) {
+                    log.debug("[KIS Auth] 메모리 캐시 토큰 사용 - userId: {}", user.getId());
+                }
+                return cached.response();
+            } else {
+                // 만료된 경우 캐시 제거
+                tokenCache.remove(user.getId());
+            }
+        }
+
+        // 2. DB 조회 및 갱신 로직 (기존 로직 유지하되 캐시 업데이트 추가)
         return kisAuthRepository.findByUser(user)
                 .filter(token -> !isTokenExpired(token))
                 .map(token -> {
-                    log.info("기존 KIS 토큰 재사용: userId={}, expiresAt={}",
-                            user.getId(), token.getAccessTokenTokenExpired());
-                    return KisAuthTokenDTO.KisTokenResponse.fromEntity(token);
+                    if (log.isDebugEnabled()) {
+                        log.debug("[KIS Auth] DB 토큰 재사용 - userId: {}", user.getId());
+                    }
+                    KisAuthTokenDTO.KisTokenResponse response = KisAuthTokenDTO.KisTokenResponse.fromEntity(token);
+
+                    // DB에서 가져온 유효 토큰을 메모리 캐시에 등록
+                    tokenCache.put(user.getId(), new CachedTokenInfo(response, token.getAccessTokenTokenExpired()));
+
+                    return response;
                 })
                 .orElseGet(() -> {
-                    log.info("신규 KIS 토큰 발급: userId={}", user.getId());
+                    log.info("[KIS Auth] 신규 토큰 발급 (API 요청) - userId: {}", user.getId());
                     KisAuthTokenDTO.KisTokenRequest tokenRequest = buildTokenRequest(user);
-                    KisAuthTokenDTO.KisTokenResponse response =
-                            requestNewToken(useVirtualServer, tokenRequest);
+                    KisAuthTokenDTO.KisTokenResponse response = requestNewToken(useVirtualServer, tokenRequest);
+
+                    // DB 저장 및 캐시 등록
                     saveOrUpdateToken(user, response);
+
                     return response;
                 });
     }
 
     /**
-     * 🔥 WebSocket용 approval_key
-     * - ❌ 재사용 절대 금지
-     * - ✅ 무조건 새로 발급
+     * WebSocket용 approval_key (항상 신규 발급)
      */
-    @Transactional(propagation = Propagation.REQUIRES_NEW)
     public String issueApprovalKey(boolean useVirtualServer, User user) {
-        log.info("웹소켓 접속키 신규 발급(재사용 금지): userId={}", user.getId());
+        log.info("[KIS Auth] 웹소켓 접속키 신규 발급 - userId: {}", user.getId());
         return reissueApprovalKey(useVirtualServer, user);
     }
 
     /**
      * WebSocket approval_key 강제 재발급
      */
-    @Transactional(propagation = Propagation.REQUIRES_NEW)
     public String reissueApprovalKey(boolean useVirtualServer, User user) {
         KisAuthToken token = kisAuthRepository.findByUser(user)
                 .orElseThrow(() ->
                         new BusinessException(ErrorCode.AUTH_TOKEN_NOT_FOUND,
                                 "인증 토큰 정보가 없습니다.")
                 );
-
-        log.info("웹소켓 접속키 강제 재발급: userId={}", user.getId());
 
         KisAuthTokenDTO.KisApprovalKeyResponse response =
                 requestNewApprovalKey(useVirtualServer, user);
@@ -91,20 +117,20 @@ public class KisAuthService {
     }
 
     /**
-     * 토큰 강제 만료 (필요 시)
+     * 토큰 강제 만료
      */
-    @Transactional(propagation = Propagation.REQUIRES_NEW)
     public void expireToken(User user) {
+        // 메모리 캐시 즉시 제거
+        tokenCache.remove(user.getId());
+
         kisAuthRepository.findByUser(user).ifPresent(token -> {
-            log.info("KIS 토큰 강제 만료 처리: userId={}", user.getId());
+            log.info("[KIS Auth] 토큰 강제 만료 - userId: {}", user.getId());
             token.setAccessTokenTokenExpired(LocalDateTime.now().minusMinutes(1));
             kisAuthRepository.save(token);
         });
     }
 
-    /* =========================
-       내부 유틸 메서드
-       ========================= */
+    // ========== 내부 유틸 메서드 ==========
 
     private boolean isTokenExpired(KisAuthToken token) {
         return token.getAccessTokenTokenExpired()
@@ -130,7 +156,7 @@ public class KisAuthService {
                     KisAuthTokenDTO.KisTokenResponse.class
             );
         } catch (RestClientException e) {
-            log.error("KIS 토큰 발급 API 호출 실패", e);
+            log.error("[KIS Auth] 토큰 발급 실패: {}", e.getMessage());
             throw new BusinessException(
                     ErrorCode.KIS_API_ERROR,
                     "토큰 발급에 실패했습니다."
@@ -164,30 +190,26 @@ public class KisAuthService {
                     KisAuthTokenDTO.KisApprovalKeyResponse.class
             );
         } catch (RestClientException e) {
-            log.error("KIS 웹소켓 접속키 발급 API 호출 실패", e);
+            log.error("[KIS Auth] 웹소켓 접속키 발급 실패: {}", e.getMessage());
             throw new BusinessException(
                     ErrorCode.KIS_API_ERROR,
                     "웹소켓 접속키 발급에 실패했습니다."
             );
         }
     }
+
     public String getHashKey(User user, String jsonBody) {
         try {
-            // 헤더 설정
             HttpHeaders headers = new HttpHeaders();
             headers.setContentType(MediaType.APPLICATION_JSON);
             headers.set("appkey", encryptionUtil.decrypt(user.getAppkey()));
             headers.set("appsecret", encryptionUtil.decrypt(user.getAppsecret()));
-            headers.set("User-Agent", "Mozilla/5.0"); // 필수는 아니지만 안정성을 위해 권장
+            headers.set("User-Agent", "Mozilla/5.0");
 
-            // Body는 이미 JSON 문자열 상태여야 함 (KisApiClient에서 변환해서 넘겨줌)
             HttpEntity<String> entity = new HttpEntity<>(jsonBody, headers);
 
-            // 실전/모의 서버 구분 없이 HashKey 발급은 실전 URL 사용 권장 (또는 설정에 따름)
-            // 여기서는 안전하게 실전 URL로 고정하거나 Config에서 가져오세요.
             String url = "https://openapi.koreainvestment.com:9443/uapi/hashkey";
 
-            // 요청 전송
             ResponseEntity<Map> response = restTemplate.postForEntity(url, entity, Map.class);
 
             Map<String, Object> body = response.getBody();
@@ -195,14 +217,15 @@ public class KisAuthService {
                 return (String) body.get("HASH");
             }
 
-            log.error("HashKey 응답에 HASH 값이 없습니다: {}", body);
+            log.error("[KIS Auth] HashKey 응답에 HASH 값이 없음");
             return null;
 
         } catch (Exception e) {
-            log.error("HashKey 발급 실패: {}", e.getMessage());
+            log.error("[KIS Auth] HashKey 발급 실패: {}", e.getMessage());
             throw new BusinessException(ErrorCode.KIS_API_ERROR, "HashKey 발급 중 오류 발생");
         }
     }
+
     private void saveOrUpdateToken(User user, KisAuthTokenDTO.KisTokenResponse response) {
         KisAuthToken token = kisAuthRepository.findByUser(user)
                 .orElse(KisAuthToken.builder().user(user).build());
@@ -214,5 +237,9 @@ public class KisAuthService {
         );
 
         kisAuthRepository.save(token);
+
+        // 캐시에도 저장 (중요: Entity가 업데이트된 후의 만료 시간을 사용해야 정확함)
+        // updateToken 내부 로직에 따라 만료 시간이 설정되었으므로, token 객체에서 시간 정보를 가져옴
+        tokenCache.put(user.getId(), new CachedTokenInfo(response, token.getAccessTokenTokenExpired()));
     }
 }

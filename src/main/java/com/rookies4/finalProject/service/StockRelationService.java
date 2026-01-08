@@ -8,12 +8,14 @@ import com.rookies4.finalProject.exception.ErrorCode;
 import com.rookies4.finalProject.repository.StockRelationRepository;
 import com.rookies4.finalProject.repository.StockRepository;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
 import java.util.stream.Collectors;
 
+@Slf4j
 @Service
 @RequiredArgsConstructor
 @Transactional
@@ -36,7 +38,9 @@ public class StockRelationService {
                 .relationType(request.getRelationType())
                 .build();
 
-        return StockRelationDTO.StockRelationResponse.fromEntity(stockRelationRepository.save(stockRelation));
+        StockRelation saved = stockRelationRepository.save(stockRelation);
+        log.info("[StockRelation] 종목 관계 생성 - From: {}, To: {}, Type: {}", request.getFromStockCode(), request.getToStockCode(), request.getRelationType());
+        return StockRelationDTO.StockRelationResponse.fromEntity(saved);
     }
 
     //2. FromStock 기준 조회

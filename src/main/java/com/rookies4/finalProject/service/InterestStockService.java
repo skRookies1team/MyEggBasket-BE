@@ -11,12 +11,14 @@ import com.rookies4.finalProject.repository.StockRepository;
 import com.rookies4.finalProject.repository.UserRepository;
 import com.rookies4.finalProject.security.SecurityUtil;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
 import java.util.stream.Collectors;
 
+@Slf4j
 @Service
 @RequiredArgsConstructor
 @Transactional
@@ -44,6 +46,7 @@ public class InterestStockService {
                 .build();
         InterestStock savedInterestStock = interestStockRepository.save(interestStock);
 
+        log.info("[Interest] 관심 종목 추가 성공 - UserId: {}, StockCode: {}, StockName: {}", user.getId(), stock.getStockCode(), stock.getName());
         return InterestStockDTO.InterestStockResponse.fromEntity(savedInterestStock);
     }
 
@@ -52,10 +55,13 @@ public class InterestStockService {
     public List<InterestStockDTO.InterestStockResponse> showInterestStock(){
         User user = getCurrentUser();
 
-        return interestStockRepository.findByUserOrderByAddedAtDesc(user)
+        List<InterestStockDTO.InterestStockResponse> interests = interestStockRepository.findByUserOrderByAddedAtDesc(user)
                 .stream()
                 .map(InterestStockDTO.InterestStockResponse::fromEntity)
                 .collect(Collectors.toList());
+        
+        log.info("[Interest] 관심 종목 조회 성공 - UserId: {}, Count: {}", user.getId(), interests.size());
+        return interests;
     }
 
     //3. 관심종목 삭제
@@ -71,6 +77,7 @@ public class InterestStockService {
         }
 
         interestStockRepository.delete(interestStock);
+        log.info("[Interest] 관심 종목 삭제 성공 - UserId: {}, StockCode: {}", user.getId(), stockCode);
     }
 
     private User getCurrentUser() {

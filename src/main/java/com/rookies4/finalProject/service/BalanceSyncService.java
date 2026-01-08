@@ -20,6 +20,7 @@ import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
 @Slf4j
@@ -39,40 +40,51 @@ public class BalanceSyncService {
 
     /**
      * KIS 잔고 조회 + DB 동기화 + 원본 KIS 응답 반환
+     *
+     * 트랜잭션 분리 전략:
+     * 1. 외부 API 호출은 트랜잭션 밖에서 실행 (DB 커넥션 낭비 방지)
+     * 2. DB 작업만 최소 범위의 트랜잭션으로 처리
      */
-    @Transactional
     public KisBalanceDTO syncAndGetFromKis(User user, boolean useVirtual) {
-        // 1. 토큰 발급
+        // STEP 1: 토큰 발급 (별도 트랜잭션, 빠르게 커밋됨)
         KisAuthTokenDTO.KisTokenResponse tokenResponse =
                 kisAuthService.issueToken(useVirtual, user);
 
         String accessToken = tokenResponse.getAccessToken();
-        log.info("[SYNC] 토큰 준비 완료, userId={}", user.getId());
+        log.info("[SYNC] 잔고 동기화 시작 - userId: {}, virtual: {}", user.getId(), useVirtual);
 
-        // 2. KIS 잔고 조회
+        // STEP 2: KIS API 호출 (트랜잭션 밖에서 실행 - 중요!)
+        // 외부 API 응답 대기 중에 DB 커넥션을 잡고 있지 않음
         KisBalanceDTO kisBalance =
                 kisBalanceService.getBalanceFromKis(user, accessToken, useVirtual);
 
-        // 3. 응답 null 처리
         if (kisBalance == null) {
-            log.warn("[BALANCE_SYNC] KIS 잔고 응답이 null, userId={}", user.getId());
+            log.warn("[SYNC] KIS 응답이 null - userId: {}", user.getId());
             return null;
         }
 
-        // 4. DB 동기화 실행
-        syncFromKis(user.getId(), kisBalance, useVirtual);
+        // STEP 3: DB 동기화 (새로운 트랜잭션으로 실행)
+        try {
+            syncFromKis(user.getId(), kisBalance, useVirtual);
+            log.info("[SYNC] 동기화 완료 - userId: {}", user.getId());
+        } catch (Exception e) {
+            log.error("[SYNC] 동기화 실패 - userId: {}, error: {}", user.getId(), e.getMessage());
+            // 동기화 실패해도 KIS 원본 데이터는 반환 (조회 기능은 정상 작동)
+        }
 
         return kisBalance;
     }
 
     /**
-     * KIS 잔고 기준으로 우리 DB(Portfolio/Holding) 동기화
-     * - orphanRemoval=true를 활용하여 리스트에서 제거 시 DB 삭제 유도
-     * - 타입 불일치 해결 (Integer, Float)
+     * KIS 잔고 기준으로 DB 동기화
+     *
+     * 트랜잭션 전략:
+     * - REQUIRES_NEW: 독립적인 트랜잭션으로 실행
+     * - 외부 API 호출과 분리되어 있어 커넥션 점유 시간 최소화
+     * - 실패해도 상위 메서드에 영향 없음
      */
-    @Transactional
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
     public void syncFromKis(Long userId, KisBalanceDTO kisBalance, boolean useVirtual) {
-
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new BusinessException(
                         ErrorCode.USER_NOT_FOUND,
@@ -82,7 +94,6 @@ public class BalanceSyncService {
         // 1. 포트폴리오 찾기 또는 생성
         Portfolio portfolio = findOrCreateKisPortfolio(user, useVirtual);
 
-        // KIS에서 응답받은 보유 종목 리스트
         List<KisBalanceDTO.KisBalanceDetail> details = kisBalance.getOutput1();
         if (details == null) details = new ArrayList<>();
 
@@ -95,89 +106,98 @@ public class BalanceSyncService {
                         (existing, replacement) -> existing
                 ));
 
-        // 2. [삭제] DB 포트폴리오에는 있지만 KIS 잔고에는 없는 종목 제거
+        // 2. [삭제] DB에는 있지만 KIS에는 없는 종목 제거
         List<Holding> holdings = portfolio.getHoldings();
+        int removedCount = holdings.size();
         holdings.removeIf(h -> {
             String code = (h.getStock() != null) ? h.getStock().getStockCode() : null;
-            // 코드가 없거나, KIS 응답 맵에 없으면 삭제 대상
-            boolean toDelete = code == null || !kisMap.containsKey(code);
-            if (toDelete) {
-                log.info("[BALANCE_SYNC] 보유 종목 삭제: code={}", code);
-            }
-            return toDelete;
+            return code == null || !kisMap.containsKey(code);
         });
+        removedCount -= holdings.size();
 
         // 3. [추가/수정] KIS 정보를 바탕으로 DB 업데이트
+        int addedCount = 0;
+        int updatedCount = 0;
+
         for (KisBalanceDTO.KisBalanceDetail d : details) {
             String stockCode = d.getPdno();
             if (stockCode == null || stockCode.isBlank()) continue;
 
-            // [수정] Entity 타입(Integer)에 맞춰 변환
             Integer quantity = toInteger(d.getHldgQty());
             BigDecimal avgPrice = toBigDecimal(d.getPchsAvgPric());
 
-            // 수량이 0 이하면 보유하지 않은 것으로 간주
             if (quantity <= 0) continue;
 
-            // 3-1. Stock 엔티티 확인 (없으면 생성)
-            Stock stock = stockRepository.findByStockCode(stockCode)
-                    .map(existing -> {
-                        if (d.getPrdtName() != null && !d.getPrdtName().isBlank()) {
-                            existing.setName(d.getPrdtName());
-                        }
-                        return existing;
-                    })
-                    .orElseGet(() -> {
-                        Stock s = new Stock();
-                        s.setStockCode(stockCode);
-                        s.setName(d.getPrdtName() != null ? d.getPrdtName() : "Unknown");
-                        return stockRepository.save(s);
-                    });
+            // ⭐ Stock 조회/생성 (별도 트랜잭션으로 처리)
+            Stock stock = getOrCreateStock(stockCode, d.getPrdtName());
 
-            // 3-2. 현재 Holding 리스트에서 해당 종목 찾기
+            // Holding 찾기/생성
             Holding holding = holdings.stream()
                     .filter(h -> h.getStock() != null && stockCode.equals(h.getStock().getStockCode()))
                     .findFirst()
                     .orElse(null);
 
             if (holding == null) {
-                // 신규 추가
                 holding = Holding.builder()
                         .portfolio(portfolio)
                         .stock(stock)
-                        // .stockCode(stockCode) -> 삭제됨 (Entity에 없는 필드)
-                        .quantity(quantity)              // Integer 타입
-                        .avgPrice(avgPrice)              // BigDecimal 타입
-                        .currentWeight(0.0f)             // Float 타입 초기화
-                        .targetWeight(0.0f)              // Float 타입 초기화
+                        .quantity(quantity)
+                        .avgPrice(avgPrice)
+                        .currentWeight(0.0f)
+                        .targetWeight(0.0f)
                         .build();
                 holdings.add(holding);
+                addedCount++;
             } else {
-                // 기존 정보 업데이트
                 holding.setQuantity(quantity);
                 holding.setAvgPrice(avgPrice);
+                updatedCount++;
             }
         }
 
-        // 4. 포트폴리오 메타데이터(예수금 등) 업데이트
+        // 4. 포트폴리오 메타데이터 업데이트
         List<KisBalanceDTO.OutputSummary> summaries = kisBalance.getOutput2();
         if (summaries != null && !summaries.isEmpty()) {
             KisBalanceDTO.OutputSummary s = summaries.get(0);
-            portfolio.setTotalAsset(toBigDecimal(s.getTotEvluAmt()));   // 총평가금액
-            portfolio.setCashBalance(toBigDecimal(s.getDncaTotAmt()));   // 예수금
+            portfolio.setTotalAsset(toBigDecimal(s.getTotEvluAmt()));
+            portfolio.setCashBalance(toBigDecimal(s.getDncaTotAmt()));
         }
 
-        // 5. 최종 저장
+        // 5. 저장
         portfolioRepository.save(portfolio);
 
-        log.info("[BALANCE_SYNC] 잔고 동기화 완료: userId={}, portfolioId={}, 종목수={}",
-                userId, portfolio.getPortfolioId(), portfolio.getHoldings().size());
+        log.info("[SYNC] 동기화 완료 - 추가: {}, 수정: {}, 삭제: {}", addedCount, updatedCount, removedCount);
+    }
+
+    /**
+     * Stock 조회 또는 생성
+     *
+     * REQUIRES_NEW 사용 이유:
+     * - Stock 생성 실패해도 전체 동기화가 중단되지 않음
+     * - 여러 Holding이 같은 Stock을 참조할 때 중복 생성 방지
+     */
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
+    protected Stock getOrCreateStock(String stockCode, String stockName) {
+        return stockRepository.findByStockCode(stockCode)
+                .map(existing -> {
+                    // 종목명이 바뀌었으면 업데이트
+                    if (stockName != null && !stockName.isBlank() && !stockName.equals(existing.getName())) {
+                        existing.setName(stockName);
+                        stockRepository.save(existing);
+                    }
+                    return existing;
+                })
+                .orElseGet(() -> {
+                    Stock stock = new Stock();
+                    stock.setStockCode(stockCode);
+                    stock.setName(stockName != null ? stockName : "Unknown");
+                    return stockRepository.save(stock);
+                });
     }
 
     private Portfolio findOrCreateKisPortfolio(User user, boolean useVirtual) {
         String name = useVirtual ? VIRTUAL_PORTFOLIO_NAME : REAL_PORTFOLIO_NAME;
 
-        // Repository가 List를 반환한다고 가정하고 처리
         return portfolioRepository.findByUser(user).stream()
                 .filter(p -> name.equals(p.getName()))
                 .findFirst()

@@ -1,140 +1,112 @@
 package com.rookies4.finalProject.websocket;
 
-import java.util.List;
-import java.util.Map;
-import java.util.Set;
-import java.util.concurrent.ConcurrentHashMap;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.context.event.EventListener;
 import org.springframework.messaging.simp.stomp.StompHeaderAccessor;
+import org.springframework.messaging.simp.stomp.StompCommand;
 import org.springframework.stereotype.Component;
-import org.springframework.web.socket.messaging.SessionDisconnectEvent;
 import org.springframework.web.socket.messaging.SessionSubscribeEvent;
 import org.springframework.web.socket.messaging.SessionUnsubscribeEvent;
+import org.springframework.web.socket.messaging.SessionDisconnectEvent;
 
+import java.util.Map;
+import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
+
+/**
+ * STOMP SUBSCRIBE/ UNSUBSCRIBE 이벤트 리스너
+ * 역할:
+ * - JWT 인증된 세션만 "유효 구독자"로 카운트
+ * - 구독자 수 0 -> 1 : Kafka SUBSCRIBE 요청
+ * - 구독자 수 1 -> 0 : Kafka UNSUBSCRIBE 요청
+ */
 @Slf4j
 @Component
 @RequiredArgsConstructor
 public class StompSubscriptionEventListener {
 
-    private static final String DEST_PREFIX = "/topic/realtime-price/";
+    private final KisRealtimeConnector kisRealtimeConnector;
 
-    private final RealtimeSubscriptionManager subscriptionManager;
-    private final KisRealtimeConnector kisConnector;
+    // 종목별 구독 세션 관리
+    private final Map<String, Set<String>> subscribersByStock = new ConcurrentHashMap<>();
 
-    // sessionId -> (subscriptionId -> useVirtualServer)
-    private final Map<String, Map<String, Boolean>> virtualBySub = new ConcurrentHashMap<>();
-
+    // STOMP SUBSCRIBE 이벤트 처리
     @EventListener
-    public void onSubscribe(SessionSubscribeEvent event) {
-        StompHeaderAccessor acc = StompHeaderAccessor.wrap(event.getMessage());
+    public void handleSubscribe(SessionSubscribeEvent event) {
+        StompHeaderAccessor accessor = StompHeaderAccessor.wrap(event.getMessage());
 
-        String sessionId = acc.getSessionId();
-        String subscriptionId = acc.getSubscriptionId();
-        String destination = acc.getDestination();
-
-        if (sessionId == null || subscriptionId == null || destination == null) return;
-        if (!destination.startsWith(DEST_PREFIX)) return;
-
-        int cur = subscriptionManager.getSessionSubscriptionCount(sessionId);
-        if (cur >= 50) {
-            log.warn("[STOMP] over limit(50). session={}", sessionId);
+        // STOMP 구독 아니면 무시
+        if (accessor.getCommand() != StompCommand.SUBSCRIBE) {
             return;
         }
 
-        boolean useVirtualServer = readVirtualFlag(acc);
+        // 1. 인증 여부 확인 (CONNECT 단계에서 세팅한 값)
+        Map<String, Object> sessionAttributes = accessor.getSessionAttributes();
+        Boolean authenticated = (Boolean) sessionAttributes.get(StompAuthChannelInterceptor.AUTHENTICATED);
 
-        // virtual 값 저장(나중에 unsubscribe/disconnect에서 필요)
-        virtualBySub
-                .computeIfAbsent(sessionId, k -> new ConcurrentHashMap<>())
-                .put(subscriptionId, useVirtualServer);
+        if (!Boolean.TRUE.equals(authenticated)) {
+            log.warn("[WS] 인증되지 않은 사용자가 구독을 요청했습니다. sessionId={}", accessor.getSessionId());
+            return; // 인증되지 않은 세션은 카운트 X
+        }
 
-        int count = subscriptionManager.addSubscribe(sessionId, subscriptionId, destination);
+        // 2. 구독 destination 에서 stockCode 추출 (/topic/realtime-price/005930)
+        String destination = accessor.getDestination();
+        String stockCode = extractStockCode(destination);
 
-        String stockCode = destination.substring(DEST_PREFIX.length());
-        log.info("[STOMP] subscribe session={}, stockCode={}, subscribers={}, virtual={}",
-                sessionId, stockCode, count, useVirtualServer);
+        if (stockCode == null) {
+            return;
+        }
 
+        // 3. 구독자 수 증가
+        subscribersByStock
+                .computeIfAbsent(stockCode, k -> ConcurrentHashMap.newKeySet())
+                .add(accessor.getSessionId());
+
+        int count = subscribersByStock.get(stockCode).size();
+        log.info("[WS] SUBSCRIBE 종목코드={}, 구독자 수={}", stockCode, count);
+
+        // 4. 최초 구독자일 때만 Kafka SUBSCRIBE 요청
         if (count == 1) {
-            // (중요) 혹시 직전에 "disconnect 예약"이 걸려있다면 connectIfAbsent에서 취소됨
-            kisConnector.connectIfAbsent(useVirtualServer, stockCode);
+            kisRealtimeConnector.connectIfAbsent(false, stockCode);
         }
     }
 
+    // STOMP UNSUBSCRIBE 이벤트 처리
     @EventListener
-    public void onUnsubscribe(SessionUnsubscribeEvent event) {
-        StompHeaderAccessor acc = StompHeaderAccessor.wrap(event.getMessage());
-
-        String sessionId = acc.getSessionId();
-        String subscriptionId = acc.getSubscriptionId();
-        if (sessionId == null || subscriptionId == null) return;
-
-        RealtimeSubscriptionManager.UnsubResult r =
-                subscriptionManager.removeUnsubscribe(sessionId, subscriptionId);
-
-        // virtual 조회 후 제거
-        boolean useVirtualServer = removeVirtualFlag(sessionId, subscriptionId);
-
-        if (r.destination() == null) return;
-        if (!r.destination().startsWith(DEST_PREFIX)) return;
-
-        String stockCode = r.destination().substring(DEST_PREFIX.length());
-
-        log.info("[STOMP] unsubscribe session={}, stockCode={}, remain={}, virtual={}",
-                sessionId, stockCode, r.remain(), useVirtualServer);
-
-        if (r.remain() == 0) {
-            // 즉시 끊지 말고 유예 후 disconnect (페이지 전환/재연결에서 끊기는 문제 방지)
-            kisConnector.scheduleDisconnect(useVirtualServer, stockCode);
-        }
+    public void handleUnsubscribe(SessionUnsubscribeEvent event) {
+        StompHeaderAccessor accessor = StompHeaderAccessor.wrap(event.getMessage());
+        removeSessionFromAllStocks(accessor.getSessionId());
     }
 
+    // WebSocket DISCONNECT 처리 (브라우저 종료, 강제 종료 등)
     @EventListener
-    public void onDisconnect(SessionDisconnectEvent event) {
-        String sessionId = event.getSessionId();
-        if (sessionId == null) return;
+    public void handleDisconnect(SessionDisconnectEvent event) {
+        removeSessionFromAllStocks(event.getSessionId());
+    }
 
-        // disconnect인 경우: 이 세션이 마지막 구독자였던 destination들만 내려옴
-        Set<String> zeroDestinations = subscriptionManager.removeAllByDisconnect(sessionId);
+    // 세션이 구독 중이던 모든 종목에서 제거
+    private void removeSessionFromAllStocks(String sessionId) {
+        subscribersByStock.forEach((stockCode, sessions) -> {
+            if (sessions.remove(sessionId)) {
+                int count = sessions.size();
+                log.info("[WS] UNSUBSCRIBE 종목코드={}, 구독자 수={}", stockCode, count);
 
-        // 세션의 subscriptionId -> virtual 맵 제거 (기본은 false로 처리)
-        Map<String, Boolean> subsVirtual = virtualBySub.remove(sessionId);
+                // 마지막 구독자가 나간 경우
+                if (count == 0) {
+                    kisRealtimeConnector.scheduleDisconnect(false, stockCode);
+                }
+            }
+        });
+    }
 
-        for (String dest : zeroDestinations) {
-            if (!dest.startsWith(DEST_PREFIX)) continue;
-
-            String stockCode = dest.substring(DEST_PREFIX.length());
-
-            // disconnect 상황에선 destination만으론 subscriptionId를 모르니
-            // virtual을 정확히 매핑하기 어려움 → 보수적으로 "true가 하나라도 있으면 true"
-            boolean useVirtualServer = subsVirtual != null && subsVirtual.containsValue(true);
-
-            log.info("[STOMP] disconnect session={}, last-subscriber stockCode={}, virtual={}",
-                    sessionId, stockCode, useVirtualServer);
-
-            // 즉시 끊지 말고 유예 후 disconnect
-            kisConnector.scheduleDisconnect(useVirtualServer, stockCode);
+    // destination 에서 종목코드 추출 (/topic/realtime-price/{stockCode})
+    private String extractStockCode(String destination) {
+        if (destination == null) {
+            return null;
         }
-    }
 
-    private boolean readVirtualFlag(StompHeaderAccessor acc) {
-        List<String> v1 = acc.getNativeHeader("virtual");
-        if (v1 != null && !v1.isEmpty()) return Boolean.parseBoolean(v1.get(0));
-
-        List<String> v2 = acc.getNativeHeader("useVirtualServer");
-        if (v2 != null && !v2.isEmpty()) return Boolean.parseBoolean(v2.get(0));
-
-        return false;
-    }
-
-    private boolean removeVirtualFlag(String sessionId, String subscriptionId) {
-        Map<String, Boolean> m = virtualBySub.get(sessionId);
-        if (m == null) return false;
-
-        Boolean v = m.remove(subscriptionId);
-        if (m.isEmpty()) virtualBySub.remove(sessionId);
-
-        return v != null && v;
+        String[] parts = destination.split("/");
+        return parts.length > 0 ? parts[parts.length - 1] : null;
     }
 }

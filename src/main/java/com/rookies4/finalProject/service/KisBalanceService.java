@@ -10,6 +10,10 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
+import java.time.LocalDateTime;
+import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
+
 @Slf4j
 @Service
 @RequiredArgsConstructor
@@ -20,7 +24,25 @@ public class KisBalanceService {
     private final KisApiClient kisApiClient;
     private final ObjectMapper objectMapper;
 
+    // [캐시 추가] 유저 ID별 잔고 캐싱 (Key: userId, Value: 잔고데이터 + 만료시간)
+    private final Map<Long, CachedBalance> cache = new ConcurrentHashMap<>();
+
+    // 캐시 데이터 구조 (데이터와 만료시간을 함께 저장)
+    private record CachedBalance(KisBalanceDTO data, LocalDateTime expireAt) {}
+
     public KisBalanceDTO getBalanceFromKis(User user, String accessToken, boolean useVirtual) {
+        // 1. 캐시 확인 (새로고침 시 API 호출 방지)
+        if (cache.containsKey(user.getId())) {
+            CachedBalance cached = cache.get(user.getId());
+            // 현재 시간이 만료 시간 이전이면 캐시된 데이터 반환
+            if (LocalDateTime.now().isBefore(cached.expireAt())) {
+                log.info("[KIS] 잔고 조회 - 캐시된 데이터 반환 (UserId: {})", user.getId());
+                return cached.data();
+            }
+            // 만료되었으면 삭제
+            cache.remove(user.getId());
+        }
+
         String cano = user.getAccount();
         String trId = useVirtual ? "VTTC8434R" : "TTTC8434R";
 
@@ -42,6 +64,7 @@ public class KisBalanceService {
                 .build();
 
         try {
+            log.info("[KIS] 잔고 조회 API 실제 호출 (UserId: {})", user.getId());
             String bodyStr = kisApiClient.get(user.getId(), request, String.class);
 
             if (bodyStr == null || bodyStr.isBlank()) {
@@ -52,13 +75,11 @@ public class KisBalanceService {
             objectMapper.configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false);
             KisBalanceDTO dto = objectMapper.readValue(bodyStr, KisBalanceDTO.class);
 
-            log.info("[KIS] 파싱 결과: 성공/실패 여부 = {}, 응답 코드 = {}, 응답 메시지 = {}, 연속 조회 검색 조건 = {}, 연속 조회키 = {}, output1 크기 = {}",
-                    dto.getRtCd(),
-                    dto.getMsgCd(),
-                    dto.getMsg1(),
-                    dto.getCtxAreaFk100(),
-                    dto.getCtxAreaNk100(),
-                    dto.getOutput1() == null ? null : dto.getOutput1().size());
+            log.info("[KIS] 잔고 조회 성공 및 파싱 완료 - Msg: {}", dto.getMsg1());
+
+            // 2. 결과 캐싱 (30초간 유효)
+            // 30초 내에 다시 조회하면 API를 호출하지 않음
+            cache.put(user.getId(), new CachedBalance(dto, LocalDateTime.now().plusSeconds(30)));
 
             return dto;
 
@@ -66,5 +87,14 @@ public class KisBalanceService {
             log.error("[KIS] 잔고 조회 또는 응답 파싱 실패: {}, userId = {}", e.getMessage(), user.getId(), e);
             return new KisBalanceDTO();
         }
+    }
+
+    /**
+     * [옵션] 매수/매도 주문 성공 시 호출하여 잔고 캐시를 즉시 초기화하는 메소드
+     * (TradeController 등에서 주문 완료 후 호출해주면 더 정확합니다)
+     */
+    public void clearCache(Long userId) {
+        cache.remove(userId);
+        log.info("[KIS] 잔고 캐시 초기화 완료 (UserId: {})", userId);
     }
 }

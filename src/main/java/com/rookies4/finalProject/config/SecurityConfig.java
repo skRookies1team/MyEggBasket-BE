@@ -64,13 +64,17 @@ public class SecurityConfig {
                                 "/api/app/auth/signup",
                                 "/api/app/auth/login",
                                 "/api/users",
+                                "/api/internal/**",
                                 "/api/auth/**",
-                                "/api/app/stocks/**",// [추가됨] 주식 관련 API 허용
+                                "/api/app/ai/keywords/**",
+                                "/api/app/stocks/**",
                                 "/api/app/kis/stock/**",
+                                "/api/app/kis/trade/**",
                                 "/api/app/kis/rank/**",
-                                "/api/test/**", // 테스트 API 허용
-                                "/ws/**",
-                                "/test-stomp.html"
+                                "/api/app/subscriptions/active-codes",
+                                "api/app/portfolios/**",
+                                "/api/test/**",
+                                "/ws/**", "/ws"
                         ).permitAll()
                         .requestMatchers("/swagger-ui/**", "/v3/api-docs/**", "/swagger-resources/**").permitAll()
                         .requestMatchers("/actuator/**").permitAll()
@@ -84,8 +88,10 @@ public class SecurityConfig {
     }
     @Bean
     public CorsConfigurationSource corsConfigurationSource() {
-        CorsConfiguration configuration = new CorsConfiguration();
-        configuration.setAllowedOriginPatterns(List.of("https://dnz1jynzd0gb3.cloudfront.net"));
+        CorsConfiguration configuration = new CorsConfiguration();configuration.setAllowedOriginPatterns(List.of(
+                "https://dnz1jynzd0gb3.cloudfront.net",
+                "http://localhost:5173"
+        ));
         configuration.setAllowedMethods(Arrays.asList("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"));
         configuration.setAllowedHeaders(List.of("*"));
         configuration.setAllowCredentials(true);
