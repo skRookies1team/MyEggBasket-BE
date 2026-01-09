@@ -37,7 +37,8 @@ public class AIRecommendationService {
     private final UserRepository userRepository; // [추가] 사용자 조회를 위해 주입
 
     // 기존 메서드 (웹 프론트엔드용)
-    public AIRecommendationDTO.RecommendationResponse createRecommendation(AIRecommendationDTO.RecommendationCreateRequest request) {
+    public AIRecommendationDTO.RecommendationResponse createRecommendation(
+            AIRecommendationDTO.RecommendationCreateRequest request) {
         Long currentUserId = requireCurrentUser();
 
         Portfolio portfolio = portfolioRepository.findById(request.getPortfolioId())
@@ -140,12 +141,25 @@ public class AIRecommendationService {
         return currentUserId;
     }
 
+    // [추가] 글로벌 리밸런싱 알림 체크
+    @Transactional(readOnly = true)
+    public List<Long> checkRebalancingStatus() {
+        Long currentUserId = requireCurrentUser();
+
+        // 최근 24시간 이내의 추천만 알림 대상으로 설정 (정책에 따라 변경 가능)
+        java.time.LocalDateTime since = java.time.LocalDateTime.now().minusHours(24);
+
+        return aiRecommendationRepository.findDistinctPortfolioIdsWithActiveRecommendations(currentUserId, since);
+    }
+
     private void validateOwnership(Portfolio portfolio, Long userId) {
         if (portfolio.getUser() == null || !portfolio.getUser().getId().equals(userId)) {
             throw new BusinessException(ErrorCode.AUTH_ACCESS_DENIED, "해당 포트폴리오에 대한 접근 권한이 없습니다.");
         }
     }
-    public AIRecommendationDTO.RecommendationResponse createRecommendationByAI(AIRecommendationDTO.RecommendationCreateRequest request) {
+
+    public AIRecommendationDTO.RecommendationResponse createRecommendationByAI(
+            AIRecommendationDTO.RecommendationCreateRequest request) {
         Portfolio portfolio;
 
         // 1. Portfolio 결정 로직 (userId 우선)

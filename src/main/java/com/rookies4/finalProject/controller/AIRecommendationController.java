@@ -33,4 +33,13 @@ public class AIRecommendationController {
             @PathVariable Long portfolioId) {
         return ResponseEntity.ok(aiRecommendationService.getRecentRecommendations(portfolioId));
     }
+
+    // [추가] 글로벌 알림용 리밸런싱 상태 조회
+    @GetMapping("/ai-recommendations/status")
+    public ResponseEntity<java.util.Map<String, Object>> getRebalancingStatus() {
+        List<Long> portfolioIds = aiRecommendationService.checkRebalancingStatus();
+        return ResponseEntity.ok(java.util.Map.of(
+                "hasRebalancing", !portfolioIds.isEmpty(),
+                "portfolioIds", portfolioIds));
+    }
 }

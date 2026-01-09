@@ -25,10 +25,19 @@ public class KisStockService {
     private final StockRepository stockRepository;
 
     // 마지막 성공 가격을 저장할 메모리 캐시 (Key: 종목코드)
-    private final Map<String, CurrentPriceDTO> lastKnownPrices = new ConcurrentHashMap<>();
+    private final Map<String, CachedPrice> priceCache = new ConcurrentHashMap<>();
+    private static final long CACHE_TTL_MS = 5000; // 캐시 유효 시간 5초
 
     public CurrentPriceDTO getCurrentPrice(String stockCode, boolean useVirtualServer, Long userId) {
         validateStockCodeFormat(stockCode);
+
+        // 1. 캐시 확인 (유효하면 반환)
+        if (priceCache.containsKey(stockCode)) {
+            CachedPrice cached = priceCache.get(stockCode);
+            if (!cached.isExpired()) {
+                return cached.getData();
+            }
+        }
 
         try {
             // KisApiClient를 사용한 API 호출
@@ -46,20 +55,39 @@ public class KisStockService {
             CurrentPriceDTO result = mapToCurrentPrice(response, stockCode);
 
             // [성공 시] 캐시에 최신 데이터 저장
-            lastKnownPrices.put(stockCode, result);
+            priceCache.put(stockCode, new CachedPrice(result));
 
             return result;
 
         } catch (Exception e) {
             // [실패 시] 캐시 확인 및 폴백 처리
-            if (lastKnownPrices.containsKey(stockCode)) {
+            if (priceCache.containsKey(stockCode)) {
                 log.warn("[Fallback] '{}' API 조회 실패 -> 캐시된 과거 데이터 반환. (Error: {})", stockCode, e.getMessage());
-                return lastKnownPrices.get(stockCode);
+                return priceCache.get(stockCode).getData();
             }
 
             // 캐시 데이터도 없으면 에러 로깅 후 throw
             log.error("[Error] '{}' API 조회 실패 & 캐시 데이터 없음. Error: {}", stockCode, e.getMessage());
             throw e;
+        }
+    }
+
+    // 캐시용 내부 클래스
+    private static class CachedPrice {
+        private final CurrentPriceDTO data;
+        private final long timestamp;
+
+        public CachedPrice(CurrentPriceDTO data) {
+            this.data = data;
+            this.timestamp = System.currentTimeMillis();
+        }
+
+        public boolean isExpired() {
+            return (System.currentTimeMillis() - timestamp) > CACHE_TTL_MS;
+        }
+
+        public CurrentPriceDTO getData() {
+            return data;
         }
     }
 
@@ -114,17 +142,20 @@ public class KisStockService {
     }
 
     private Double parseDouble(Object value) {
-        if (value == null || String.valueOf(value).trim().isEmpty()) return 0.0;
+        if (value == null || String.valueOf(value).trim().isEmpty())
+            return 0.0;
         return Double.parseDouble(String.valueOf(value).replace(",", ""));
     }
 
     private BigDecimal parseBigDecimal(Object value) {
-        if (value == null || String.valueOf(value).trim().isEmpty()) return BigDecimal.ZERO;
+        if (value == null || String.valueOf(value).trim().isEmpty())
+            return BigDecimal.ZERO;
         return new BigDecimal(String.valueOf(value).replace(",", ""));
     }
 
     private Long parseLong(Object value) {
-        if (value == null || String.valueOf(value).trim().isEmpty()) return 0L;
+        if (value == null || String.valueOf(value).trim().isEmpty())
+            return 0L;
         return Long.parseLong(String.valueOf(value).replace(",", ""));
     }
 }
